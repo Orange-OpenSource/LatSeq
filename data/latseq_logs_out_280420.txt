@@ -1,0 +1,246 @@
+3944 orphans / 6912
+[INFO] Writing latseq.lseqj ...
+['mac.txreq', 'phy.out.proc', 'mac.mux', 'rlc.tx.am', 'rlc.seg.am', 'phy.in.proc', 'mac.demux', 'rlc.rx.um', 'rlc.unseg.um', 'pdcp.rx', 'ip', 'pdcp.in.gtp', 'pdcp.in', 'pdcp.tx', 'rlc.tx.um', 'rlc.seg.um']
+Paths found in /home/flavien/latseq.23042020.lseq 
+Downlink paths
+        path 0 : ip -> pdcp.in -> pdcp.tx -> rlc.tx.um -> rlc.seg.um -> mac.mux -> mac.txreq -> phy.out.proc
+        path 1 : rlc.tx.am -> rlc.seg.am -> mac.mux -> mac.txreq -> phy.out.proc
+Uplink paths
+        path 2 : phy.in.proc -> mac.demux -> rlc.rx.um -> rlc.unseg.um -> pdcp.rx -> ip
+
+Stats for Journeys latency
+Values           |       Downlink
+------           |       --------
+Size             |       107
+Average          |       18.9
+StDev            |       60.5
+Max              |       4.46e+02
+[75..90%]        |       37.6
+[50..75%]        |       11.6
+[25..50%]        |       3.01
+[10..25%]        |       0.598
+[0..10%]         |       0.197
+Min              |       0.0341
+Values           |       Uplink
+------           |       ------
+Size             |       445
+Average          |       0.745
+StDev            |       1.65
+Max              |       8.37
+[75..90%]        |       3.0
+[50..75%]        |       0.987
+[25..50%]        |       0.00787
+[10..25%]        |       0.00596
+[0..10%]         |       0.00596
+Min              |       0.00477
+
+Latency for points
+Stats for Point Latency for mac.txreq
+Values           |       Downlink
+------           |       --------
+Size             |       107
+Average          |       0.0328
+StDev            |       0.005
+Max              |       0.052
+[75..90%]        |       0.0369
+[50..75%]        |       0.0319
+[25..50%]        |       0.031
+[10..25%]        |       0.031
+[0..10%]         |       0.03
+Min              |       0.03
+
+Stats for Point Latency for mac.mux
+Values           |       Downlink
+------           |       --------
+Size             |       107
+Average          |       0.736
+StDev            |       1.41
+Max              |       8.03
+[75..90%]        |       2.08
+[50..75%]        |       1.0
+[25..50%]        |       0.0031
+[10..25%]        |       0.00191
+[0..10%]         |       0.00191
+Min              |       0.000954
+
+Stats for Point Latency for rlc.tx.am
+Values           |       Downlink
+------           |       --------
+Size             |       2
+Average          |       0.0
+StDev            |       0.0
+Max              |       0.0
+[75..90%]        |       0.0
+[50..75%]        |       0.0
+[25..50%]        |       0.0
+[10..25%]        |       0.0
+[0..10%]         |       0.0
+Min              |       0.0
+
+Stats for Point Latency for rlc.seg.am
+Values           |       Downlink
+------           |       --------
+Size             |       2
+Average          |       0.000954
+StDev            |       0.0
+Max              |       0.000954
+[75..90%]        |       0.000954
+[50..75%]        |       0.000954
+[25..50%]        |       0.000954
+[10..25%]        |       0.000954
+[0..10%]         |       0.000954
+Min              |       0.000954
+
+Stats for Point Latency for ip
+Values           |       Downlink
+------           |       --------
+Size             |       105
+Average          |       0.0
+StDev            |       0.0
+Max              |       0.0
+[75..90%]        |       0.0
+[50..75%]        |       0.0
+[25..50%]        |       0.0
+[10..25%]        |       0.0
+[0..10%]         |       0.0
+Min              |       0.0
+
+Stats for Point Latency for pdcp.in
+Values           |       Downlink
+------           |       --------
+Size             |       105
+Average          |       0.875
+StDev            |       2.6
+Max              |       10.5
+[75..90%]        |       1.57
+[50..75%]        |       0.00405
+[25..50%]        |       0.00215
+[10..25%]        |       0.000954
+[0..10%]         |       0.0
+Min              |       0.0
+
+Stats for Point Latency for pdcp.tx
+Values           |       Downlink
+------           |       --------
+Size             |       105
+Average          |       0.000549
+StDev            |       0.000488
+Max              |       0.00119
+[75..90%]        |       0.000954
+[50..75%]        |       0.000954
+[25..50%]        |       0.000954
+[10..25%]        |       0.0
+[0..10%]         |       0.0
+Min              |       0.0
+
+Stats for Point Latency for rlc.tx.um
+Values           |       Downlink
+------           |       --------
+Size             |       105
+Average          |       17.6
+StDev            |       60.5
+Max              |       4.45e+02
+[75..90%]        |       36.1
+[50..75%]        |       9.99
+[25..50%]        |       0.805
+[10..25%]        |       0.459
+[0..10%]         |       0.158
+Min              |       0.00811
+
+Stats for Point Latency for rlc.seg.um
+Values           |       Downlink
+------           |       --------
+Size             |       105
+Average          |       0.00106
+StDev            |       0.000729
+Max              |       0.00286
+[75..90%]        |       0.00215
+[50..75%]        |       0.00191
+[25..50%]        |       0.000954
+[10..25%]        |       0.000954
+[0..10%]         |       0.0
+Min              |       0.0
+
+Stats for Point Latency for phy.in.proc
+Values           |       Uplink
+------           |       ------
+Size             |       445
+Average          |       0.0
+StDev            |       0.0
+Max              |       0.0
+[75..90%]        |       0.0
+[50..75%]        |       0.0
+[25..50%]        |       0.0
+[10..25%]        |       0.0
+[0..10%]         |       0.0
+Min              |       0.0
+
+Stats for Point Latency for mac.demux
+Values           |       Uplink
+------           |       ------
+Size             |       445
+Average          |       0.737
+StDev            |       1.65
+Max              |       8.36
+[75..90%]        |       2.99
+[50..75%]        |       0.976
+[25..50%]        |       0.00119
+[10..25%]        |       0.000954
+[0..10%]         |       0.000954
+Min              |       0.0
+
+Stats for Point Latency for rlc.rx.um
+Values           |       Uplink
+------           |       ------
+Size             |       445
+Average          |       0.000267
+StDev            |       0.000441
+Max              |       0.00119
+[75..90%]        |       0.000954
+[50..75%]        |       0.000954
+[25..50%]        |       0.0
+[10..25%]        |       0.0
+[0..10%]         |       0.0
+Min              |       0.0
+
+Stats for Point Latency for rlc.unseg.um
+Values           |       Uplink
+------           |       ------
+Size             |       445
+Average          |       0.00337
+StDev            |       0.00695
+Max              |       0.0451
+[75..90%]        |       0.00801
+[50..75%]        |       0.00501
+[25..50%]        |       0.000954
+[10..25%]        |       0.0
+[0..10%]         |       0.0
+Min              |       0.0
+
+Stats for Point Latency for pdcp.rx
+Values           |       Uplink
+------           |       ------
+Size             |       445
+Average          |       0.00457
+StDev            |       0.00166
+Max              |       0.0112
+[75..90%]        |       0.00663
+[50..75%]        |       0.00501
+[25..50%]        |       0.00501
+[10..25%]        |       0.00405
+[0..10%]         |       0.00215
+Min              |       0.000954
+
+Stats for Point Latency for ip
+Values           |       Uplink
+------           |       ------
+Size             |       105
+Average          |       0.0
+StDev            |       0.0
+Max              |       0.0
+[75..90%]        |       0.0
+[50..75%]        |       0.0
+[25..50%]        |       0.0
+[10..25%]        |       0.0
+[0..10%]         |       0.0
+Min              |       0.0

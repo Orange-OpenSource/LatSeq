@@ -1,0 +1,12 @@
+point;D0;D1;U0
+rlc.tx.am;0.0275;0;0
+pdcp.in;0;0.036237;0
+pdcp.tx;0;0.000254;0
+rlc.tx.um;0;0.667063;0
+rlc.seg.um;0;0.00678;0
+mac.mux;0.05505;0.276935;0
+phy.out.proc;0.91745;0.018839;0
+phy.in.proc;0;0;0.29064
+mac.demux;0;0;0.023038
+rlc.rx.um;0;0;0.29647
+pdcp.rx;0;0;0.389864

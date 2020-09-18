@@ -1,0 +1,1 @@
+select(.["dir"] == 0 and .["set_ids"]["gsn"] == "18")

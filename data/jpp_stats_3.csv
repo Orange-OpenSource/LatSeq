@@ -1,0 +1,14 @@
+path;point;nb;latency;
+D0;rlc.tx.am;0;0.0275;
+D0;mac.mux;0;0.05505;
+D0;phy.out.proc;0;0.91745;
+D1;pdcp.in;0;0.036237;
+D1;pdcp.tx;0;0.000254;
+D1;rlc.tx.um;0;0.0667063;
+D1;rlc.seg.um;0;0.000678;
+D1;mac.mux;0;0.02769;
+D1;phy.out.proc;0;0.018839;
+U0;phy.in.proc;0;0.29064;
+U0;mac.demux;0;0.02304;
+U0;rlc.rx.um;0;0.29648;
+U0;pdcp.rx;0;0.389864;

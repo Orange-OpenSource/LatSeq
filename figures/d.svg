@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="3000" height="50">
+
+    <style>
+    line.col {
+	stroke-width: 1;
+	stroke:       black;
+	stroke-dasharray: 2 5;
+    }
+    </style>
+
+
+    <defs>
+    <filter x="0" y="0" width="1" height="1" id="bgwhite">
+    <feFlood flood-color="white"/>
+    <feComposite in="SourceGraphic" operator="over" />
+    </filter>
+    </defs>
+
+ <g>
+  <line class="col" x1="100" y1="150" x2="100" y2="100%" />
+  <line class="col" x1="150" y1="150" x2="150" y2="100%" />
+  <line class="col" x1="200" y1="150" x2="200" y2="100%" />
+  <line class="col" x1="250" y1="150" x2="250" y2="100%" />
+  <line class="col" x1="300" y1="150" x2="300" y2="100%" />
+  <line class="col" x1="350" y1="150" x2="350" y2="100%" />
+  <line class="col" x1="400" y1="150" x2="400" y2="100%" />
+  <line class="col" x1="450" y1="150" x2="450" y2="100%" />
+  <line class="col" x1="500" y1="150" x2="500" y2="100%" />
+  <line class="col" x1="550" y1="150" x2="550" y2="100%" />
+  <line class="col" x1="600" y1="150" x2="600" y2="100%" />
+  <line class="col" x1="650" y1="150" x2="650" y2="100%" />
+  <line class="col" x1="700" y1="150" x2="700" y2="100%" />
+  <line class="col" x1="750" y1="150" x2="750" y2="100%" />
+  <line class="col" x1="800" y1="150" x2="800" y2="100%" />
+  <line class="col" x1="850" y1="150" x2="850" y2="100%" />
+  <line class="col" x1="900" y1="150" x2="900" y2="100%" />
+  <line class="col" x1="950" y1="150" x2="950" y2="100%" />
+  <line class="col" x1="1000" y1="150" x2="1000" y2="100%" />
+  <line class="col" x1="1050" y1="150" x2="1050" y2="100%" />
+  <line class="col" x1="1100" y1="150" x2="1100" y2="100%" />
+  <line class="col" x1="1150" y1="150" x2="1150" y2="100%" />
+  <line class="col" x1="1200" y1="150" x2="1200" y2="100%" />
+  <line class="col" x1="1250" y1="150" x2="1250" y2="100%" />
+  <line class="col" x1="1300" y1="150" x2="1300" y2="100%" />
+  <line class="col" x1="1350" y1="150" x2="1350" y2="100%" />
+  <line class="col" x1="1400" y1="150" x2="1400" y2="100%" />
+  <line class="col" x1="1450" y1="150" x2="1450" y2="100%" />
+
+
+  <text transform="rotate(-90,100,140)" x="100" y="140" text-anchor="start" dominant-baseline="middle">ip</text>
+  <text transform="rotate(-90,150,140)" x="150" y="140" text-anchor="start" dominant-baseline="middle">pdcp.in.tun</text>
+  <text transform="rotate(-90,200,140)" x="200" y="140" text-anchor="start" dominant-baseline="middle">pdcp.in.nl</text>
+  <text transform="rotate(-90,250,140)" x="250" y="140" text-anchor="start" dominant-baseline="middle">pdcp.in.gtp</text>
+  <text transform="rotate(-90,300,140)" x="300" y="140" text-anchor="start" dominant-baseline="middle">pdcp.in</text>
+  <text transform="rotate(-90,350,140)" x="350" y="140" text-anchor="start" dominant-baseline="middle">pdcp.tx</text>
+  <text transform="rotate(-90,400,140)" x="400" y="140" text-anchor="start" dominant-baseline="middle">rlc.tx.am</text>
+  <text transform="rotate(-90,450,140)" x="450" y="140" text-anchor="start" dominant-baseline="middle">rlc.seg.am</text>
+  <text transform="rotate(-90,500,140)" x="500" y="140" text-anchor="start" dominant-baseline="middle">rlc.tx.um</text>
+  <text transform="rotate(-90,550,140)" x="550" y="140" text-anchor="start" dominant-baseline="middle">rlc.seg.um</text>
+  <text transform="rotate(-90,600,140)" x="600" y="140" text-anchor="start" dominant-baseline="middle">rlc.tx.tm</text>
+  <text transform="rotate(-90,650,140)" x="650" y="140" text-anchor="start" dominant-baseline="middle">mac.mux</text>
+  <text transform="rotate(-90,700,140)" x="700" y="140" text-anchor="start" dominant-baseline="middle">mac.txreq</text>
+  <text transform="rotate(-90,750,140)" x="750" y="140" text-anchor="start" dominant-baseline="middle">phy.out.proc</text>
+  <text transform="rotate(-90,800,140)" x="800" y="140" text-anchor="start" dominant-baseline="middle">phy.out</text>
+  <text transform="rotate(-90,850,140)" x="850" y="140" text-anchor="start" dominant-baseline="middle">phy.in</text>
+  <text transform="rotate(-90,900,140)" x="900" y="140" text-anchor="start" dominant-baseline="middle">phy.in.proc</text>
+  <text transform="rotate(-90,950,140)" x="950" y="140" text-anchor="start" dominant-baseline="middle">mac.demux</text>
+  <text transform="rotate(-90,1000,140)" x="1000" y="140" text-anchor="start" dominant-baseline="middle">rlc.rx.am</text>
+  <text transform="rotate(-90,1050,140)" x="1050" y="140" text-anchor="start" dominant-baseline="middle">rlc.rx.um</text>
+  <text transform="rotate(-90,1100,140)" x="1100" y="140" text-anchor="start" dominant-baseline="middle">rlc.rx.tm</text>
+  <text transform="rotate(-90,1150,140)" x="1150" y="140" text-anchor="start" dominant-baseline="middle">rlc.unseg.um</text>
+  <text transform="rotate(-90,1200,140)" x="1200" y="140" text-anchor="start" dominant-baseline="middle">rlc.unseg.am</text>
+  <text transform="rotate(-90,1250,140)" x="1250" y="140" text-anchor="start" dominant-baseline="middle">pdcp.rx</text>
+  <text transform="rotate(-90,1300,140)" x="1300" y="140" text-anchor="start" dominant-baseline="middle">pdcp.out</text>
+  <text transform="rotate(-90,1350,140)" x="1350" y="140" text-anchor="start" dominant-baseline="middle">pdcp.out.nas</text>
+  <text transform="rotate(-90,1400,140)" x="1400" y="140" text-anchor="start" dominant-baseline="middle">pdcp.out.nl</text>
+  <text transform="rotate(-90,1450,140)" x="1450" y="140" text-anchor="start" dominant-baseline="middle">pdcp.out.gtp</text>
+
+ </g>
+</svg>
