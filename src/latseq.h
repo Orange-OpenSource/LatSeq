@@ -23,44 +23,30 @@
   #define _GNU_SOURCE
 #endif
 #include <pthread.h>
-//#include <T.h>
 #include <utils.h>
-#include <LOG/log.h>
-#include <openair1/PHY/TOOLS/time_meas.h>
-
-
-/*----------------------------------------------------------------------------*/
 
 /*--- DEFINE -----------------------------------------------------------------*/
 
-#define MAX_LOG_SIZE        32
-#define MAX_LOG_OCCUPANCY   24 // Should be < MAX_LOG_OCCUPANCY
-#define MAX_POINT_NAME_SIZE 32
-#define MAX_NAME_SIZE       64
-//#define MAX_LEN_DATA_ID     12 //correspond to name + value. value might be represent with 6 chars
-#define MAX_NB_DATA_ID      16
-#define NB_DATA_IDENTIFIERS 10 // to update according to distinct data identifier used in point
-#define MAX_SIZE_LINE_OF_LOG 128 // ts=8c + pointname=MAX_POINT_NAME_SIZEc + identifier=NB_DATA_IDENTIFIERx(4c name + 4c number) (Worst-case)
+#define RING_BUFFER_SIZE    128 // Number of fingerprints in Ring Buffer
+#define NB_DATA_IDENTIFIERS 10  // to update according to distinct data identifier used in point
+#define LATSEQ_MAX_STR_SIZE 128 // Length for filelog_name AND latseq fingerprint string size
+#define CHUNK_SIZE_ITEMS    16  // Size of chunk of ring buffer to read at data collector. 1 correspoding to full RR, RING_BUFFER_SIZE read all buffer by passage
+#define MAX_NB_THREAD       32  // Maximum number of instrumented threads expected
 
-#define LATSEQ_P3(p, f, i1) do {log_measure1(p, f, i1); } while(0)
-#define LATSEQ_P4(p, f, i1, i2) do {log_measure2(p, f, i1, i2); } while(0)
-#define LATSEQ_P5(p, f, i1, i2, i3) do {log_measure3(p, f, i1, i2, i3); } while(0)
-#define LATSEQ_P6(p, f, i1, i2, i3, i4) do {log_measure4(p, f, i1, i2, i3, i4);} while(0)
-#define LATSEQ_P7(p, f, i1, i2, i3, i4, i5) do {log_measure5(p, f, i1, i2, i3, i4, i5); } while(0)
-#define LATSEQ_P8(p, f, i1, i2, i3, i4, i5, i6) do {log_measure6(p, f, i1, i2, i3, i4, i5, i6); } while(0)
-#define LATSEQ_P9(p, f, i1, i2, i3, i4, i5, i6, i7) do {log_measure7(p, f, i1, i2, i3, i4, i5, i6, i7); } while(0)
-#define LATSEQ_P10(p, f, i1, i2, i3, i4, i5, i6, i7, i8) do {log_measure8(p, f, i1, i2, i3, i4, i5, i6, i7, i8); } while(0)
-#define LATSEQ_P11(p, f, i1, i2, i3, i4, i5, i6, i7, i8, i9) do {log_measure9(p, f, i1, i2, i3, i4, i5, i6, i7, i8, i9); } while(0)
-#define LATSEQ_P12(p, f, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10) do {log_measure10(p, f, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10); } while(0)
-
+/*--- MACRO ------------------------------------------------------------------*/
+#define LATSEQ_P3(p, f, i1) do {log_measure1(p, f, (uint32_t)i1); } while(0)
+#define LATSEQ_P4(p, f, i1, i2) do {log_measure2(p, f, (uint32_t)i1, (uint32_t)i2); } while(0)
+#define LATSEQ_P5(p, f, i1, i2, i3) do {log_measure3(p, f, (uint32_t)i1, (uint32_t)i2, (uint32_t)i3); } while(0)
+#define LATSEQ_P6(p, f, i1, i2, i3, i4) do {log_measure4(p, f, (uint32_t)i1, (uint32_t)i2, (uint32_t)i3, (uint32_t)i4);} while(0)
+#define LATSEQ_P7(p, f, i1, i2, i3, i4, i5) do {log_measure5(p, f, (uint32_t)i1, (uint32_t)i2, (uint32_t)i3, (uint32_t)i4, (uint32_t)i5); } while(0)
+#define LATSEQ_P8(p, f, i1, i2, i3, i4, i5, i6) do {log_measure6(p, f, (uint32_t)i1, (uint32_t)i2, (uint32_t)i3, (uint32_t)i4, (uint32_t)i5, (uint32_t)i6); } while(0)
+#define LATSEQ_P9(p, f, i1, i2, i3, i4, i5, i6, i7) do {log_measure7(p, f, (uint32_t)i1, (uint32_t)i2, (uint32_t)i3, (uint32_t)i4, (uint32_t)i5, (uint32_t)i6, (uint32_t)i7); } while(0)
+#define LATSEQ_P10(p, f, i1, i2, i3, i4, i5, i6, i7, i8) do {log_measure8(p, f, (uint32_t)i1, (uint32_t)i2, (uint32_t)i3, (uint32_t)i4, (uint32_t)i5, (uint32_t)i6, (uint32_t)i7, (uint32_t)i8); } while(0)
+#define LATSEQ_P11(p, f, i1, i2, i3, i4, i5, i6, i7, i8, i9) do {log_measure9(p, f, (uint32_t)i1, (uint32_t)i2, (uint32_t)i3, (uint32_t)i4, (uint32_t)i5, (uint32_t)i6, (uint32_t)i7, (uint32_t)i8, (uint32_t)i9); } while(0)
+#define LATSEQ_P12(p, f, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10) do {log_measure10(p, f, (uint32_t)i1, (uint32_t)i2, (uint32_t)i3, (uint32_t)i4, (uint32_t)i5, (uint32_t)i6, (uint32_t)i7, (uint32_t)i8, (uint32_t)i9, (uint32_t)i10); } while(0)
 #define GET_MACRO(_1,_2,_3,_4,_5,_6,_7,_8,_9,_10,_11,_12,NAME,...) NAME
 #define LATSEQ_P(...) GET_MACRO(__VA_ARGS__, LATSEQ_P12, LATSEQ_P11, LATSEQ_P10, LATSEQ_P9, LATSEQ_P8, LATSEQ_P7, LATSEQ_P6, LATSEQ_P5, LATSEQ_P4, LATSEQ_P3)(__VA_ARGS__)
-
-
-
 #define OCCUPANCY(w, r) (w - r)
-
-#define MAX_NB_THREAD 32
 
 /*--- STRUCT -----------------------------------------------------------------*/
 
@@ -68,22 +54,21 @@
 typedef struct latseq_element_t {
   uint64_t            ts; // timestamp of the measure
   const char *        point;
-  //char                point[MAX_POINT_NAME_SIZE]; // point name
   const char *        format;
-  //char *              format; // format for the data identifier
-  short               len_id; // Number data identifiers
-  uint32_t            data_id[MAX_NB_DATA_ID]; // values for the data identifier. What is the best type ?
+  ushort              len_id; // Number data identifiers
+  uint32_t            data_id[NB_DATA_IDENTIFIERS]; // values for the data identifier. What is the best type ?
 } latseq_element_t;
 
 // Statistics structures for latseq
 typedef struct latseq_stats_t {
-  unsigned int        entry_counter;
+  uint32_t        entry_counter;
+  uint32_t        bytes_counter;
 } latseq_stats_t;
 
 //thread specific data struct
 typedef struct latseq_thread_data_t {
   uint8_t             th_latseq_id; //Identifier of pthread for registry
-  latseq_element_t    log_buffer[MAX_LOG_SIZE]; //log buffer, structure mutex-less
+  latseq_element_t    log_buffer[RING_BUFFER_SIZE]; //log buffer, structure mutex-less
   unsigned int        i_write_head; // position of writer in the log_buffer (main thread)
 } latseq_thread_data_t;
 
@@ -98,7 +83,6 @@ typedef struct latseq_registry_t {
 // Global structure of LatSeq module
 typedef struct latseq_t {
   int                 is_running; //1 is running, 0 not running
-  int                 is_debug; //1 debug, 0 prod
   char *              filelog_name;
   FILE *              outstream; //Output descriptor
   struct timeval      time_zero; // time zero
@@ -113,13 +97,12 @@ extern latseq_t g_latseq; // global structure
 extern __thread latseq_thread_data_t tls_latseq;
 
 /*--- FUNCTIONS --------------------------------------------------------------*/
-/** \fn int init_latseq(const char * appname, int debug);
+/** \fn int init_latseq(const char * appname);
  * \brief init latency sequences module.
  * \param appname app's name. The output file is appname.date_hour.lseq
- * \param debug level for this instance of latseq
  * \return 0 if error 1 otherwise
 */
-int init_latseq(const char * appname, int debug);
+int init_latseq(const char * appname);
 
 /** \fn init_logger_to_mem(void);
  * \brief init thread logger
@@ -132,22 +115,32 @@ void init_logger_latseq(void);
 */
 int init_thread_for_latseq(void);
 
+/** \fn rdtsc(void);
+ * \brief rdtsc wrapper
+ * \return time
+*/
+static __inline__ uint64_t rdtsc(void) {
+  uint32_t a, d;
+  __asm__ volatile ("rdtsc" : "=a" (a), "=d" (d));
+  return (((uint64_t)d)<<32) | ((uint64_t)a);
+}
+
+/** \fn get_cpu_freq_MHz(void);
+ * \brief Compute CPU clock in a 1 second experiment
+ * \return CPU clock in MHz
+*/
+double get_cpu_freq_MHz(void);
+
+/*--- MEASUREMENTS -----------------------------------------------------------*/
 /** \fn void log_measure(const char * point, const char *identifier);
- * \brief function to log a new measure into buffer
+ * \brief function to log a new measure into buffer.
+ * From 1 to NB_DATA_IDENTIFIERS
  * \param point name of the measurement point
  * \param id identifier for the data pointed
  * \todo  measure latency introduced by this function
 */
-//static __inline__ void log_measure1(const char * point, const char *fmt, ...)
 static __inline__ void log_measure1(const char * point, const char *fmt, uint32_t i1)
 {
-  /*
-#ifdef LATSEQ_DEBUG
-  struct timeval begin, end;
-  gettimeofday(&begin, NULL);
-#endif
-*/
-  //TODO : chack that latseq is running
   //check if the oai thread is already registered
   if (tls_latseq.th_latseq_id == 0) {
     //is not initialized yet
@@ -155,26 +148,14 @@ static __inline__ void log_measure1(const char * point, const char *fmt, uint32_
       return;
     }
   }
-  // No check here because it will be check by the reader
-  //get list of argument
-  //va_list va;
-  //va_start(va, fmt); //start all values after fmt
-
   //get reference on new element
-  latseq_element_t * e = &tls_latseq.log_buffer[tls_latseq.i_write_head%MAX_LOG_SIZE];
-
+  latseq_element_t * e = &tls_latseq.log_buffer[tls_latseq.i_write_head%RING_BUFFER_SIZE];
   //Log time
-  e->ts = rdtsc(); //Not used because rdtsc from log.h seems to be not static
-  //e->ts = rdtsc_oai(); //use of rdtsc defined in time_meas.h
-  //unsigned long long a, d;
-  //__asm__ volatile ("rdtsc" : "=a" (a), "=d" (d));
-  //e->ts = (d<<32) | a; //because of imcompatibility between inline and static of rdtsc. Assumption : usage of __x86_64__
-
+  e->ts = rdtsc();
   //Log point name
   //strcpy(e->point, point);
   e->point = point;
   e->format = fmt;
-
   //Log data identifier
   //e->len_id = 0;
   e->len_id = 1;
@@ -182,17 +163,8 @@ static __inline__ void log_measure1(const char * point, const char *fmt, uint32_
   //  e->len_id++;
   //becareful, the data_id[e->len_id + 1] = (uint32_t)-1. Use len_id to know the correct number of element
   e->data_id[0] = i1;
-  
   //Update head position
   tls_latseq.i_write_head++;
-  //Clean up va_list
-  //va_end(va);
-  /*
-#ifdef LATSEQ_DEBUG
-  gettimeofday(&end, NULL);
-  printf("[LATSEQ] log_measure took : 06%lu us\n", (end.tv_usec - begin.tv_usec)); //at 23-03, 60usec
-#endif
-*/
 }
 
 static __inline__ void log_measure2(const char * point, const char *fmt, uint32_t i1, uint32_t i2)
@@ -203,7 +175,7 @@ static __inline__ void log_measure2(const char * point, const char *fmt, uint32_
       return;
     }
   }
-  latseq_element_t * e = &tls_latseq.log_buffer[tls_latseq.i_write_head%MAX_LOG_SIZE];
+  latseq_element_t * e = &tls_latseq.log_buffer[tls_latseq.i_write_head%RING_BUFFER_SIZE];
   e->ts = rdtsc();
   e->point = point;
   e->format = fmt;
@@ -221,7 +193,7 @@ static __inline__ void log_measure3(const char * point, const char *fmt, uint32_
       return;
     }
   }
-  latseq_element_t * e = &tls_latseq.log_buffer[tls_latseq.i_write_head%MAX_LOG_SIZE];
+  latseq_element_t * e = &tls_latseq.log_buffer[tls_latseq.i_write_head%RING_BUFFER_SIZE];
   e->ts = rdtsc();
   e->point = point;
   e->format = fmt;
@@ -240,7 +212,7 @@ static __inline__ void log_measure4(const char * point, const char *fmt, uint32_
       return;
     }
   }
-  latseq_element_t * e = &tls_latseq.log_buffer[tls_latseq.i_write_head%MAX_LOG_SIZE];
+  latseq_element_t * e = &tls_latseq.log_buffer[tls_latseq.i_write_head%RING_BUFFER_SIZE];
   e->ts = rdtsc();
   e->point = point;
   e->format = fmt;
@@ -260,7 +232,7 @@ static __inline__ void log_measure5(const char * point, const char *fmt, uint32_
       return;
     }
   }
-  latseq_element_t * e = &tls_latseq.log_buffer[tls_latseq.i_write_head%MAX_LOG_SIZE];
+  latseq_element_t * e = &tls_latseq.log_buffer[tls_latseq.i_write_head%RING_BUFFER_SIZE];
   e->ts = rdtsc();
   e->point = point;
   e->format = fmt;
@@ -281,7 +253,7 @@ static __inline__ void log_measure6(const char * point, const char *fmt, uint32_
       return;
     }
   }
-  latseq_element_t * e = &tls_latseq.log_buffer[tls_latseq.i_write_head%MAX_LOG_SIZE];
+  latseq_element_t * e = &tls_latseq.log_buffer[tls_latseq.i_write_head%RING_BUFFER_SIZE];
   e->ts = rdtsc();
   e->point = point;
   e->format = fmt;
@@ -304,7 +276,7 @@ static __inline__ void log_measure7(const char * point, const char *fmt, uint32_
       return;
     }
   }
-  latseq_element_t * e = &tls_latseq.log_buffer[tls_latseq.i_write_head%MAX_LOG_SIZE];
+  latseq_element_t * e = &tls_latseq.log_buffer[tls_latseq.i_write_head%RING_BUFFER_SIZE];
   e->ts = rdtsc();
   e->point = point;
   e->format = fmt;
@@ -328,7 +300,7 @@ static __inline__ void log_measure8(const char * point, const char *fmt, uint32_
       return;
     }
   }
-  latseq_element_t * e = &tls_latseq.log_buffer[tls_latseq.i_write_head%MAX_LOG_SIZE];
+  latseq_element_t * e = &tls_latseq.log_buffer[tls_latseq.i_write_head%RING_BUFFER_SIZE];
   e->ts = rdtsc();
   e->point = point;
   e->format = fmt;
@@ -353,7 +325,7 @@ static __inline__ void log_measure9(const char * point, const char *fmt, uint32_
       return;
     }
   }
-  latseq_element_t * e = &tls_latseq.log_buffer[tls_latseq.i_write_head%MAX_LOG_SIZE];
+  latseq_element_t * e = &tls_latseq.log_buffer[tls_latseq.i_write_head%RING_BUFFER_SIZE];
   e->ts = rdtsc();
   e->point = point;
   e->format = fmt;
@@ -379,7 +351,7 @@ static __inline__ void log_measure10(const char * point, const char *fmt, uint32
       return;
     }
   }
-  latseq_element_t * e = &tls_latseq.log_buffer[tls_latseq.i_write_head%MAX_LOG_SIZE];
+  latseq_element_t * e = &tls_latseq.log_buffer[tls_latseq.i_write_head%RING_BUFFER_SIZE];
   e->ts = rdtsc();
   e->point = point;
   e->format = fmt;
