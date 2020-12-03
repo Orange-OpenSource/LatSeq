@@ -36,37 +36,58 @@ __thread latseq_thread_data_t tls_latseq = {
   .th_latseq_id = 0
 }; // need to be a thread local storage variable.
 pthread_t logger_thread;
-extern double cpuf; //cpu frequency in MHz -> usec. Should be initialized in main.c
+pthread_t fflusher_thread;
+//double cpuf; //cpu frequency in MHz -> usec. Should be initialized in main.c
 extern volatile int oai_exit; //oai is ended. Close latseq
 
 /*--- UTILS FUNCTIONS --------------------------------------------------------*/
 
-double get_cpu_freq_MHz(void)
+uint64_t get_cpu_freq_cycles(void)
 {
-  uint64_t ts = 0;
-  ts = rdtsc();
+  uint64_t ts = l_rdtsc();
   sleep(1);
-  uint64_t diff = (rdtsc() - ts);
-  return (double)diff/1000000;
+  return (l_rdtsc() - ts);
 }
 
 /*--- MAIN THREAD FUNCTIONS --------------------------------------------------*/
 
-int init_latseq(const char * appname)
+int init_latseq(const char * appname, uint64_t cpufreq)
 { 
   // init members
   g_latseq.is_running = 0;
   //synchronise time and rdtsc
-  gettimeofday(&g_latseq.time_zero, NULL);
-  g_latseq.rdtsc_zero = rdtsc(); //check at compile time that constant_tsc is enabled in /proc/cpuinfo
-  if (cpuf == 0) {
-    cpuf = get_cpu_freq_MHz();
+  struct timespec ts;
+  clock_gettime(CLOCK_REALTIME, &ts);
+  g_latseq.time_zero = (uint64_t)ts.tv_sec * 1000000000LL + (uint64_t)ts.tv_nsec;
+  g_latseq.rdtsc_zero = l_rdtsc(); //check at compile time that constant_tsc is enabled in /proc/cpuinfo
+  if (cpufreq == 0) {
+    g_latseq.cpu_freq = get_cpu_freq_cycles();
+  } else {
+    g_latseq.cpu_freq = cpufreq;
   }
 
+  // Open traces
   char time_string[16];
-  strftime(time_string, sizeof (time_string), "%d%m%Y_%H%M%S", localtime(&g_latseq.time_zero.tv_sec));
+  strftime(time_string, sizeof (time_string), "%d%m%Y_%H%M%S", localtime(&ts.tv_sec));
   g_latseq.filelog_name = (char *)malloc(LATSEQ_MAX_STR_SIZE);
   sprintf(g_latseq.filelog_name, "%s.%s.lseq", appname, time_string);
+  //open logfile
+  g_latseq.outstream = fopen(g_latseq.filelog_name, "w");
+  if (g_latseq.outstream == NULL) {
+    g_latseq.is_running = 0;
+    printf("[LATSEQ] Error at opening log file\n");
+    return -1;
+  }
+  //write header
+  char hdr[] = "# LatSeq packet fingerprints\n# By Alexandre Ferrieux and Flavien Ronteix Jacquet\n# timestamp\tU/D\tsrc--dest\tlen:ctxtId:localId\n";
+  size_t ret = fwrite(hdr, sizeof(char), sizeof(hdr) - 1, g_latseq.outstream);
+  if (ret < 0) {
+    printf("[LATSEQ] Error at opening log file\n");
+    g_latseq.is_running = 0;
+    return -1;
+  }
+  fprintf(g_latseq.outstream, "%ld S rdtsc--gettimeofday %ld.%09ld\n", g_latseq.rdtsc_zero, ts.tv_sec, ts.tv_nsec);
+  fflush(g_latseq.outstream);
   
   // init registry
   g_latseq.local_log_buffers.read_ith_thread = 0;
@@ -82,22 +103,22 @@ int init_latseq(const char * appname)
   
   // init logger thread
   g_latseq.is_running = 1;
-  init_logger_latseq();
-
-  return g_latseq.is_running;
+  
+  return init_logger_latseq();
 }
 
-void init_logger_latseq(void)
+int init_logger_latseq(void)
 {
   // init thread to write buffer to file
   if(pthread_create(&logger_thread, NULL, (void *) &latseq_log_to_file, NULL) > 0) {
     printf("[LATSEQ] Error at starting data collector\n");
     g_latseq.is_running = 0;
-    return;
+    return -1;
   }
-  if (g_latseq.is_debug && g_latseq.is_running) {
-    printf("[LATSEQ] Logger thread started\n");
-  }
+  // init thread to flush into file
+  pthread_create(&fflusher_thread, NULL, (void *) &fflush_latseq_periodically, NULL);
+
+  return g_latseq.is_running;
 }
 
 void latseq_print_stats(void)
@@ -118,8 +139,6 @@ int close_latseq(void)
     fprintf(stderr, "[LATSEQ] error on closing %s\n", g_latseq.filelog_name);
     exit(EXIT_FAILURE);
   }
-  if (g_latseq.is_debug)
-    latseq_print_stats();
   return 1;
 }
 
@@ -130,13 +149,14 @@ int init_thread_for_latseq(void)
 
   //Init tls_latseq for local thread
   tls_latseq.i_write_head = 0; //local thread tls_latseq
-  memset(tls_latseq.log_buffer, 0, sizeof(tls_latseq.log_buffer));
+  //memset(tls_latseq.log_buffer, 0, sizeof(tls_latseq.log_buffer));
 
   //Register thread in the registry
   latseq_registry_t * reg = &g_latseq.local_log_buffers;
   //Check if space left in registry
   if (reg->nb_th >= MAX_NB_THREAD) {
     g_latseq.is_running = 0;
+    fprintf(g_latseq.outstream, "Max instrumented thread MAX_NB_THREAD reached\n");
     return -1;
   }
   reg->tls[reg->nb_th] = &tls_latseq;
@@ -163,13 +183,6 @@ static int write_latseq_entry(void)
   char * tmps;
   //Convert latseq_element to a string
   tmps = calloc(LATSEQ_MAX_STR_SIZE, sizeof(char));
-  //Compute time
-  uint64_t tdiff = (uint64_t)(((double)(e->ts - g_latseq.rdtsc_zero))/cpuf);
-  uint64_t tf = ((uint64_t)(g_latseq.time_zero.tv_sec)*1000000L + (uint64_t)(g_latseq.time_zero.tv_usec)) + tdiff;
-  struct timeval etv = {
-    (time_t) ((tf - (tf%1000000L))/1000000L),
-    (suseconds_t) (tf%1000000L)
-  };
   //Write the data identifier, e.g. do the vsprintf() here and not at measure()
   //We put the first NB_DATA_IDENTIFIERS elements of array, even there are no NB_DATA_IDENTIFIERS element to write. sprintf will get the firsts...
   sprintf(
@@ -193,9 +206,8 @@ static int write_latseq_entry(void)
     e->data_id[15]);
 
   // Write into file
-  int ret = fprintf(g_latseq.outstream, "%ld.%06ld %s %s\n",
-    etv.tv_sec,
-    etv.tv_usec,
+  int ret = fprintf(g_latseq.outstream, "%ld %s %s\n",
+    e->ts,
     e->point,
     tmps);
 
@@ -225,17 +237,7 @@ static int write_latseq_entry(void)
 
 void latseq_log_to_file(void)
 {
-  //open logfile
-  g_latseq.outstream = fopen(g_latseq.filelog_name, "w");
-  if (g_latseq.outstream == NULL) {
-    g_latseq.is_running = 0;
-    printf("[LATSEQ] Error at opening log file\n");
-    pthread_exit(NULL);
-  }
-  //write header
-  char hdr[] = "# LatSeq packet fingerprints\n# By Alexandre Ferrieux and Flavien Ronteix Jacquet\n# timestamp\tU/D\tsrc--dest\tlen:ctxtId:localId\n";
-  fwrite(hdr, sizeof(char), sizeof(hdr) - 1, g_latseq.outstream);
-
+  // pthread config
   pthread_t thId = pthread_self();
   //set name
   pthread_setname_np(thId, "latseq_log_to_file");
@@ -244,13 +246,12 @@ void latseq_log_to_file(void)
   pthread_setschedprio(thId, prio_for_policy);
 
   latseq_registry_t * reg = &g_latseq.local_log_buffers;
-
   int items_to_read = 0;
 
   while (!oai_exit) { // run until oai is stopped
     if (!g_latseq.is_running) { break; } //running flag is at 0, not running
     //If no thread registered, continue and wait
-    if (reg->nb_th == 0) { continue; }
+    if (reg->nb_th == 0) { usleep(1000); continue; }
     //Select a thread to read with read_ith_thread. 
     // Using RR for now, WRR in near future according to occupancy
     if (reg->read_ith_thread + 1 >= reg->nb_th) {
@@ -287,5 +288,17 @@ void latseq_log_to_file(void)
   }
   //close_latseq(); // function to close latseq properly
   //exit thread
+  pthread_exit(NULL);
+}
+
+void fflush_latseq_periodically(void)
+{
+  struct timespec ts;
+  while(1){
+    sleep(1);
+    fflush(g_latseq.outstream);
+    clock_gettime(CLOCK_REALTIME, &ts);
+    fprintf(g_latseq.outstream, "%ld S rdtsc--gettimeofday %ld.%09ld\n", l_rdtsc(), ts.tv_sec, ts.tv_nsec);
+  }
   pthread_exit(NULL);
 }
