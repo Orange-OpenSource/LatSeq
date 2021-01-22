@@ -61,7 +61,7 @@ inside the base station.
 
 ## Usage
 
-![LatSeq archi](figures/latseq-archi)
+![LatSeq archi](figures/latseq-archi.jpg)
 
 **Write the code**
 
