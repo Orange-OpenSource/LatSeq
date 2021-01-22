@@ -3,9 +3,9 @@
 #include <unistd.h>
 #include <pthread.h>
 
-//#ifdef LATSEQ
-#include "latseq.h"
-//#endif
+#ifdef LATSEQ
+  #include "latseq.h"
+#endif
 
 double cpuf;
 const char * test_log = "test";

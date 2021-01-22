@@ -4,7 +4,6 @@
 # Process latseq logs to get statistics and visualization
 #
 # (C) 2020 Flavien Ronteix--Jacquet, Lannion, France
-# Released under MIT License
 # email flavien.ronteixjacquet@orange.com
 # -----------------------------------------------------------
 

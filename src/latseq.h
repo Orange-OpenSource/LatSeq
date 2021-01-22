@@ -24,7 +24,6 @@
 #endif
 #include <pthread.h>
 #include <utils.h>
-// #include <openair1/PHY/TOOLS/time_meas.h> // needed if LatSeq used in OAI. import get_cpu_freq_GHz()
 
 /*--- DEFINE -----------------------------------------------------------------*/
 
