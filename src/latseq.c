@@ -1,10 +1,17 @@
-/*! \file latseq.c
-* \brief latency sequence tool
-* \author Flavien Ronteix--Jacquet
-* \date 2020
-* \version 1.0
-* @ingroup util
-*/
+/*
+ * Software Name : LatSeq
+ * Version: 1.0
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2021 Orange Labs
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
+ * This software is distributed under the BSD 3-clause,
+ * the text of which is available at https://opensource.org/licenses/BSD-3-Clause
+ * or see the "license.txt" file for more details.
+ *
+ * Author: Flavien Ronteix--Jacquet
+ * Software description: LatSeq measurement part core
+ */
+
 #define _GNU_SOURCE // required for pthread_setname_np()
 #include "latseq.h"
 

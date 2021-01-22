@@ -1,11 +1,18 @@
 #!/usr/bin/python3
 
-# -----------------------------------------------------------
-# Process latseq logs to get statistics and visualization
+#################################################################################
+# Software Name : LatSeq
+# Version: 1.0
+# SPDX-FileCopyrightText: Copyright (c) 2020-2021 Orange Labs
+# SPDX-License-Identifier: BSD-3-Clause
 #
-# (C) 2020 Flavien Ronteix--Jacquet, Lannion, France
-# email flavien.ronteixjacquet@orange.com
-# -----------------------------------------------------------
+# This software is distributed under the BSD 3-clause,
+# the text of which is available at https://opensource.org/licenses/BSD-3-Clause
+# or see the "license.txt" file for more details.
+#
+# Author: Flavien Ronteix--Jacquet
+# Software description: LatSeq stats script
+#################################################################################
 
 """Calculate statistics on a latseq_logs output
 

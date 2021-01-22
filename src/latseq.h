@@ -1,3 +1,17 @@
+/*
+ * Software Name : LatSeq
+ * Version: 1.0
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2021 Orange Labs
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
+ * This software is distributed under the BSD 3-clause,
+ * the text of which is available at https://opensource.org/licenses/BSD-3-Clause
+ * or see the "license.txt" file for more details.
+ *
+ * Author: Flavien Ronteix--Jacquet
+ * Software description: LatSeq measurement part core
+ */
+
 #ifndef __LATSEQ_H__
 #define __LATSEQ_H__
 
