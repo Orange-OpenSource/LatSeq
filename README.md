@@ -1,4 +1,4 @@
-<img src="./figures/latseq-logo.png" alt="LatSeq" border=3 height=50 width=150></img>
+<img src="./figures/latseq-logo.png" alt="LatSeq" border=3 height=150></img>
 
 # LATency SEQuence analysis tool
 
@@ -61,7 +61,7 @@ inside the base station.
 
 ## Usage
 
-[LatSeq archi](./figures/latseq-archi)
+[LatSeq archi](figures/latseq-archi)
 
 **Write the code**
 
