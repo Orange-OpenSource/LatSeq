@@ -1,8 +1,12 @@
 <img src="./figures/latseq-logo.png" alt="LatSeq" border=3 height=150></img>
 
 # LATency SEQuence analysis tool
+Copyright &copy; 2020, Orange Labs
 
-***F. Ronteix--Jacquet, Orange Labs Networks, Lannion (France)***
+[![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
+
+
+Author : F. Ronteix--Jacquet, Orange Labs Networks, Lannion (France)
 
 A tool for internal latency analysis in the OpenAirInterface Base Station.
 Please find more details on the rationales behind this tool on the conference article "**Latseq: A low-Impact Internal Latency Measurement tool for OpenAirInterface**".
