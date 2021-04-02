@@ -6,10 +6,10 @@ Copyright &copy; 2020, Orange Labs
 [![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 
-Author : F. Ronteix--Jacquet, Orange Labs Networks, Lannion (France)
+*Author : F. Ronteix--Jacquet, flavien.ronteixjacquet@orange.com, Orange Labs Networks, Lannion (France)*
 
 A tool for internal latency analysis in the OpenAirInterface Base Station.
-Please find more details on the rationales behind this tool on the conference article "**Latseq: A low-Impact Internal Latency Measurement tool for OpenAirInterface**".
+Please find more details on the rationales behind this tool on the conference article "**Latseq: A low-Impact Internal Latency Measurement tool for OpenAirInterface**" (IEEE WCNC'21 [slides](docs/pres_latseq_wcnc.pdf))
 
 ***Abstract***
 ```
@@ -91,7 +91,7 @@ More to read in docs/Latseq.pdf
 
 ## LatSeq measurement module
 
-For now, latseq is designed to be the more independant as possible : Means that it does not use oai LOG system (not register by logInit()) and the flag "LATSEQ" disable all lines related to latseq in the code (using #ifdef).
+Latseq is designed to be the more independant as possible : Means that it does not use oai LOG system (not register by logInit()) and the flag "LATSEQ" disable all lines related to latseq in the code (using #ifdef).
 
 latseq_t, global structure for latseq embodied the latseq logging info. log_buffer is a circular buffer with 2 head index, i_write_head and i_read_head. this buffer of latseq_element_t is designed to bo mutex-less.
 
@@ -126,6 +126,9 @@ convert rdtsc value to unix timestamp value
 ex. `./rdtsctots.py trace_raw.lseq > trace.lseq`
 
 ### latseq_logs
+
+**THIS SCRIPT SHOULD BE ADAPTED FOR THE NEW LATSEQ FINGERPRINT DATA IDENTIFIERS OPTIONS : DOES NOT USE THIS SCRIPT WITH THE LAST VERSION OF LATSEQ MEASUREMENT MODULE**
+
 Proceeds LatSeq logs.
 By default, builds the latseq_log object.
 - Reads lseq file given in raw_input
@@ -320,5 +323,6 @@ in targets/TEST/LATSEQ test_latseq test different part of latseq module
 - "w" : test writer speed for a simplified data collector
 
 ## TODO
+- [ ] adapt journey rebuild script to the new data_idenfiters options.
 - [ ] list of requirements on data\_identifiers to enable rebuild journeys
 - [ ] optimize algorithm to rebuild paths
