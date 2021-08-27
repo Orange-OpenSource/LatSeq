@@ -183,13 +183,7 @@ static int write_latseq_entry(void)
     e->data_id[6],
     e->data_id[7],
     e->data_id[8],
-    e->data_id[9],
-    e->data_id[10],
-    e->data_id[11],
-    e->data_id[12],
-    e->data_id[13],
-    e->data_id[14],
-    e->data_id[15]);
+    e->data_id[9]);
 
   // Write into file
   int ret = fprintf(g_latseq.outstream, "%ld %s %s\n",

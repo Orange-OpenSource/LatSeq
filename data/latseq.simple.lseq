@@ -1,8 +1,5 @@
-# LatSeq format
-# By Alexandre Ferrieux and Flavien Ronteix Jacquet
+# LatSeq format by Alexandre Ferrieux and Flavien Ronteix Jacquet
 # timestamp	U/D	src--dest	len:ctxtId:localId
-#funcId ip pdcp.in.tun pdcp.in.nl pdcp.in.gtp pdcp.in pdcp.tx rlc.tx.am rlc.seg.am rlc.tx.um rlc.seg.um rlc.tx.tm mac.mux mac.txreq phy.out.proc phy.out phy.in phy.in.proc mac.demux rlc.rx.am rlc.rx.um rlc.rx.tm pdcp.rx pdcp.out pdcp.out.nas pdcp.out.nl pdcp.out.gtp
-# Clear
 1587645139.026616 D mac.txreq--phy.out.proc len18:rnti65535:ue0.harq0.fm182.subfm5
 1587645139.046585 D mac.txreq--phy.out.proc len18:rnti65535:ue0.harq0.fm184.subfm5
 1587645139.056415 D mac.txreq--phy.out.proc len41:rnti65535:ue0.harq0.fm185.subfm5
@@ -22,35 +19,35 @@
 1587645139.286565 D mac.txreq--phy.out.proc len18:rnti65535:ue0.harq0.fm208.subfm5
 1587645139.296399 D mac.txreq--phy.out.proc len41:rnti65535:ue0.harq0.fm209.subfm5
 1587645139.306563 D mac.txreq--phy.out.proc len18:rnti65535:ue0.harq0.fm210.subfm5
-# Linear
-1587645146.191801 D ip--pdcp.in.gtp len64:rnti54614:drb1.gsn12
+1587645146.191801 D ip.in--pdcp.in.gtp len64:rnti54614:drb1.gsn12
 1587645146.191802 D pdcp.in--pdcp.tx len64:rnti54614:drb1.gsn12.psn10
 1587645146.191803 D pdcp.tx--rlc.tx.um len66:rnti54614:drb1.psn10.lcid3.rsdu0
 1587645146.191962 D rlc.tx.um--rlc.seg.um len66:rnti54614:drb1.lcid3.rsdu0.rsn7.rso0
 1587645146.191962 D rlc.seg.um--mac.mux len68:rnti54614:drb1.lcid3.rsn7.fm899
 1587645146.191965 D mac.mux--mac.txreq len73:rnti54614:lcid3.harq7.txreq0.fm899.subfm1
 1587645146.191997 D mac.txreq--phy.out.proc len73:rnti54614:ue2.harq7.fm899.subfm1
-1587645146.207988 U phy.in.proc--mac.demux len60:rnti54614:lcid3.ue0.fm900
-1587645146.207989 U mac.demux--rlc.rx.um len60:rnti54614:drb1.lcid3.rsn16.fm900
-1587645146.207989 U rlc.rx.um--rlc.unseg.um len58:rnti54614:drb1.lcid3.rsn16.fm900
+1587645146.191999 D phy.out.proc--phy.out.ant len73:rnti54614:fm899.subfm1
+1587645146.207987 U phy.in.ant--phy.in.proc len60:rnti54614:fm900.subfm0
+1587645146.207988 U phy.in.proc--mac.demux len60:rnti54614:lcid3.ue0.fm900.subfm0
+1587645146.207989 U mac.demux--rlc.rx.um len60:rnti54614:drb1.lcid3.rsn16.fm900.subfm0
+1587645146.207989 U rlc.rx.um--rlc.unseg.um len58:rnti54614:drb1.lcid3.rsn16.fm900.subfm0
 1587645146.207990 U rlc.unseg.um--pdcp.rx len54:rnti54614:drb1.lcid3.rsn16.psn0.psn12.fm900
-1587645146.207994 U pdcp.rx--ip len52:rnti54614:drb1.psn12.fm900
-# Segmentation
-1587645146.670997 U phy.in.proc--mac.demux len150:rnti54614:lcid3.ue0.fm946
-1587645146.670997 U mac.demux--rlc.rx.um len150:rnti54614:drb1.lcid3.rsn38.fm946
-1587645146.670998 U rlc.rx.um--rlc.unseg.um len148:rnti54614:drb1.lcid3.rsn38.fm946
+1587645146.207994 U pdcp.rx--ip.out len52:rnti54614:drb1.psn12.fm900
+1587645146.670997 U phy.in.ant--phy.in.proc len150:rnti54614:fm946.subfm0
+1587645146.670997 U phy.in.proc--mac.demux len150:rnti54614:lcid3.ue0.fm946.subfm0
+1587645146.670997 U mac.demux--rlc.rx.um len150:rnti54614:drb1.lcid3.rsn38.fm946.subfm0
+1587645146.670998 U rlc.rx.um--rlc.unseg.um len148:rnti54614:drb1.lcid3.rsn38.fm946.subfm0
 1587645146.670998 U rlc.unseg.um--pdcp.rx len54:rnti54614:drb1.lcid3.rsn38.psn0.psn31.fm946
-1587645146.671003 U pdcp.rx--ip len52:rnti54614:drb1.psn31.fm946
+1587645146.671003 U pdcp.rx--ip.out len52:rnti54614:drb1.psn31.fm946
 1587645146.671003 U rlc.unseg.um--pdcp.rx len54:rnti54614:drb1.lcid3.rsn38.psn0.psn32.fm946
-1587645146.671006 U pdcp.rx--ip len52:rnti54614:drb1.psn32.fm946
+1587645146.671006 U pdcp.rx--ip.out len52:rnti54614:drb1.psn32.fm946
 1587645146.671006 U rlc.unseg.um--pdcp.rx len54:rnti54614:drb1.lcid3.rsn38.psn0.psn33.fm946
-1587645146.671008 U pdcp.rx--ip len52:rnti54614:drb1.psn33.fm946
-# Concatenation
-1587645146.681782 D ip--pdcp.in.gtp len764:rnti54614:drb1.gsn34
+1587645146.671008 U pdcp.rx--ip.out len52:rnti54614:drb1.psn33.fm946
+1587645146.681782 D ip.in--pdcp.in.gtp len764:rnti54614:drb1.gsn34
 1587645146.681783 D pdcp.in--pdcp.tx len764:rnti54614:drb1.gsn34.psn51
 1587645146.681783 D pdcp.tx--rlc.tx.um len766:rnti54614:drb1.psn51.lcid3.rsdu0
 1587645146.681950 D rlc.tx.um--rlc.seg.um len766:rnti54614:drb1.lcid3.rsdu0.rsn26.rso0
-1587645146.681795 D ip--pdcp.in.gtp len1203:rnti54614:drb1.gsn35
+1587645146.681795 D ip.in--pdcp.in.gtp len1203:rnti54614:drb1.gsn35
 1587645146.681796 D pdcp.in--pdcp.tx len1203:rnti54614:drb1.gsn35.psn52
 1587645146.681796 D pdcp.tx--rlc.tx.um len1205:rnti54614:drb1.psn52.lcid3.rsdu0
 1587645146.682935 D rlc.tx.um--rlc.seg.um len1205:rnti54614:drb1.lcid3.rsdu0.rsn27.rso240
@@ -58,20 +55,20 @@
 1587645146.682936 D rlc.seg.um--mac.mux len967:rnti54614:drb1.lcid3.rsn27.fm948
 1587645146.682938 D mac.mux--mac.txreq len1095:rnti54614:lcid3.harq2.txreq0.fm948.subfm2
 1587645146.682969 D mac.txreq--phy.out.proc len1095:rnti54614:ue2.harq2.fm948.subfm2
-# Seg+Conca
-1587645146.467146 D ip--pdcp.in.gtp len1400:rnti54614:drb1.gsn18
+1587645146.682971 D phy.out.proc--phy.out.ant len1095:rnti54614:fm899.subfm1
+1587645146.467146 D ip.in--pdcp.in.gtp len1400:rnti54614:drb1.gsn18
 1587645146.467147 D pdcp.in--pdcp.tx len1400:rnti54614:drb1.gsn18.psn14
 1587645146.467148 D pdcp.tx--rlc.tx.um len1402:rnti54614:drb1.psn14.lcid3.rsdu0
-1587645146.467149 D ip--pdcp.in.gtp len122:rnti54614:drb1.gsn18
+1587645146.467149 D ip.in--pdcp.in.gtp len122:rnti54614:drb1.gsn18
 1587645146.467149 D pdcp.in--pdcp.tx len122:rnti54614:drb1.gsn18.psn15
 1587645146.467150 D pdcp.tx--rlc.tx.um len124:rnti54614:drb1.psn15.lcid3.rsdu0
-1587645146.467285 D ip--pdcp.in.gtp len1400:rnti54614:drb1.gsn18
+1587645146.467285 D ip.in--pdcp.in.gtp len1400:rnti54614:drb1.gsn18
 1587645146.467286 D pdcp.in--pdcp.tx len1400:rnti54614:drb1.gsn18.psn16
 1587645146.467287 D pdcp.tx--rlc.tx.um len1402:rnti54614:drb1.psn16.lcid3.rsdu0
-1587645146.467288 D ip--pdcp.in.gtp len1400:rnti54614:drb1.gsn18
+1587645146.467288 D ip.in--pdcp.in.gtp len1400:rnti54614:drb1.gsn18
 1587645146.467288 D pdcp.in--pdcp.tx len1400:rnti54614:drb1.gsn18.psn17
 1587645146.467288 D pdcp.tx--rlc.tx.um len1402:rnti54614:drb1.psn17.lcid3.rsdu0
-1587645146.467291 D ip--pdcp.in.gtp len1111:rnti54614:drb1.gsn18
+1587645146.467291 D ip.in--pdcp.in.gtp len1111:rnti54614:drb1.gsn18
 1587645146.467292 D pdcp.in--pdcp.tx len1111:rnti54614:drb1.gsn18.psn18
 1587645146.467292 D pdcp.tx--rlc.tx.um len1113:rnti54614:drb1.psn18.lcid3.rsdu0
 1587645146.467947 D rlc.tx.um--rlc.seg.um len1402:rnti54614:drb1.lcid3.rsdu0.rsn11.rso0
@@ -82,4 +79,4 @@
 1587645146.467949 D rlc.seg.um--mac.mux len4584:rnti54614:drb1.lcid3.rsn11.fm926
 1587645146.467952 D mac.mux--mac.txreq len4587:rnti54614:lcid3.harq3.txreq0.fm926.subfm7
 1587645146.467984 D mac.txreq--phy.out.proc len4587:rnti54614:ue2.harq3.fm926.subfm7
-# Retransmission
+1587645146.467987 D phy.out.proc--phy.out.ant len4587:rnti54614:fm926.subfm7

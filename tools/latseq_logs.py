@@ -20,7 +20,7 @@ This modules is used to process latseq logs and provides
 some useful statistics and stats
 
 Example:
-    ./latseq_logs.py -l /home/flavien/latseq.21042020.lseq
+    python3 tools/latseq_logs.py -l data/latseq.simple.lseq
 
 Attributes:
     none
@@ -242,7 +242,7 @@ class latseq_log:
         self.initialized = True
         return
 
-    def _read_file(self) -> str:
+    def _read_file(self):
         """Read the content of the file pointed by `logpath`
 
         Returns:
@@ -581,7 +581,7 @@ class latseq_log:
         pointer = 0  # base pointer on the measure in self.inputs for the current journey's input
         local_pointer = 0  # pointer on the current tested measure candidate for the current journey
 
-        def _measure_ids_in_journey(p_gids: list, p_lids: list, j_gids: list, j_last_element: dict) -> dict:
+        def _measure_ids_in_journey(p_gids: list, p_lids: list, j_gids: list, j_last_element: dict):
             """Returns the dict of common identifiers if the measure is in the journey
             Otherwise returns an empty dictionnary
 
@@ -641,7 +641,7 @@ class latseq_log:
                 pointerP += 1
             return pointerP
 
-        def _rec_rebuild(pointerP: int, local_pointerP: int, parent_journey_id: int) -> bool:
+        def _rec_rebuild(pointerP: int, local_pointerP: int, parent_journey_id: int):
             """rebuild journey from a parent measure
             Args:
                 pointerP (int): the index in inputs of the parent measure
@@ -927,7 +927,7 @@ class latseq_log:
         # build out_journeys
         self._build_out_journeys()
 
-    def _build_out_journeys(self) -> int:
+    def _build_out_journeys(self):
         """Build out_journeys. Compute 'duration' for each points present in each journeys.
 
         Attributes:
@@ -1039,7 +1039,7 @@ class latseq_log:
             self._build_timestamp()
         return self.timestamps
 
-    def get_log_file_stats(self) -> dict:
+    def get_log_file_stats(self):
         """Get stats of the logfile
         Returns:
             file_stats (:obj:`dict`): name, nb_raw_meas, nb_meas, points
@@ -1051,7 +1051,7 @@ class latseq_log:
             "points": self.get_list_of_points()
             }
 
-    def get_paths(self) -> dict:
+    def get_paths(self):
         """Get paths found in the file
         Returns:
             paths (:obj:`dict` of :obj:`list`): 0 for Downlink paths and 1 for Uplink paths
@@ -1114,7 +1114,7 @@ class latseq_log:
             if not self._build_out_journeys():
                 logging.error("latseq_log.yield_out_journeys() : to build out_journeys")
                 exit(-1)
-        def _build_header() -> str:
+        def _build_header():
             res_str = "#funcId "
             paths = [path for dir in self.get_paths() for path in self.get_paths()[dir]]  # flatten the dict
             added_points = []
@@ -1357,6 +1357,12 @@ if __name__ == "__main__":
         help="Request paths from log file to stdout"
     )
     parser.add_argument(
+        "--notrdtsc",
+        dest="notrdtsc",
+        action='store_true',
+        help="lseq already converted to rdtsc"
+    )
+    parser.add_argument(
         "-m",
         "--metadata",
         dest="req_metadata",
@@ -1424,8 +1430,9 @@ if __name__ == "__main__":
     except FileNotFoundError:
         try:
             logging.info(f"__main__ : create a new lseq instance")
-            ro = rdtsctots.rdtsctots(args.logname)
-            ro.write_rdtsctots(args.logname)
+            if not args.notrdtsc:
+                ro = rdtsctots.rdtsctots(args.logname)
+                ro.write_rdtsctots(args.logname)
             lseq = latseq_log(args.logname)  # Build latseq_log object
         except Exception as e:
             logging.error(f"__main__ : {args.logname}, {e}")

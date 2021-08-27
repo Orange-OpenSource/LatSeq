@@ -30,4 +30,12 @@ rlc_am_mac_data_request (/*....*/) {
 /*
  * ...
  */
+
+#if LATSEQ
+    LATSEQ_P("I rlc.am.txbuf","occ%d:drb%d", l_rlc_p->sdu_buffer_occupancy, l_rlc_p->rb_id);
+#endif
+/*
+ *
+ * ...
+ */
 }

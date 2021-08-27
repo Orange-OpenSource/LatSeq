@@ -78,7 +78,11 @@ inside the base station.
     LATSEQ_P("D pdcp--rlc", "pdcp%d.rlc%d", 0, 1);  
 #endif
 ```
-where first argument is the observed segment, the second argument is a string of data\_identifiers followed by the data identifiers value.
+where first argument is the `observed segment` (type D for Downlink, U for Uplink or I for Information), the second argument is a string of `data\_identifiers` followed by the `data identifiers value`.
+
+**A proposal to put LatSeq points inside OAI LTE stack**
+
+![LatSeq points inside OAI LTE stack](figures/latseq-points_3gpp.png)
 
 **Compile the code**
 
@@ -219,10 +223,10 @@ Errors, Warnings, Informations are printed in stderr
 
 Examples of usage:
 ```bash
-./latseq_logs.py -l ~/latseq.23042020.lseq 2>/dev/null
-./latseq_logs.py -j -l ~/latseq.23042020.lseq 2>/dev/null
-./latseq_logs.py -p -l ~/latseq.23042020.lseq 2>/dev/null
-./latseq_logs.py -o -l ~/latseq.23042020.lseq > 23042020.lseqj 2>/dev/null
+python3 tools/latseq_logs.py -l data/latseq.simple.lseq 2>/dev/null
+python3 tools/latseq_logs.py -j -l data/latseq.simple.lseq 2>/dev/null
+python3 tools/latseq_logs.py -p -l data/latseq.simple.lseq 2>/dev/null
+python3 tools/latseq_logs.py -o -l data/latseq.simple.lseq > simple.lseqj 2>/dev/null
 ```
 
 ### latseq_filter
@@ -234,7 +238,7 @@ Takes a file with a filter or a filter as string in argument.
 
 Example of usage:
 ```
-./latseq_filter.sh journeys_downlinks_gsn.lfilter
+./tools/latseq_filter.sh journeys_downlinks_gsn.lfilter
 cat journeys_downlinks_gsn.lfilter
 > select(.["dir"] == 0 and .["set_ids"]["gsn"] == "18")
 ```
@@ -249,7 +253,8 @@ Arguments:
 - "-f" enables to choose format "json", "csv",...
 - "-P" prints statistics formated by the latseq_stats module.
 - "-sj" returns statistics on journeys
-`̀``json
+
+```json
 {
     "D": {
         "size": 34,
@@ -259,9 +264,10 @@ Arguments:
         "stdev": 0.153623,
         "quantiles": [0.694859, 0.699043, 0.834942, 0.838041, 0.955701]
 }
-`̀``
+```
 
 - "-sjpp" returns the shares of delay introduced by each point for each journeys by path.
+
 ```json
 {
   "U02": {  # Uplinks, path 0, point 2
@@ -282,6 +288,7 @@ Arguments:
 ```
 
 - "-sp" returns statistics on points
+
 ```json
 {
     "pdcp.rx": {
@@ -295,10 +302,11 @@ Arguments:
     },
     ...
 }
-`̀``
+```
 
 - "-djd" returns data journeys' duration
-`̀``json
+
+```json
 {
     "00": {  # first decimal indicates uplink/downlink followed by the journey unique id
         "ts": 1587645146.191801,
@@ -306,12 +314,14 @@ Arguments:
     },
     ...
 }
-`̀``
+```
 
 Example of usage of the full toolchain for LatSeq Analysis Module
+
 ```bash
-./latseq_logs.py -l ~/latseq.simple.lseq -j 2>/dev/null | ./latseq_filter.sh journeys_downlinks_gsn.lfilt | ./latseq_stats.py -sj --print
+python3 tools/latseq_logs.py -l data/latseq.simple.lseq -j 2>/dev/null | ./tools/latseq_filter.sh cfg/journeys_downlinks_gsn.lfilt | python3 tools/latseq_stats.py -sj --print
 ```
+
 ## TEST_LATSEQ
 in targets/TEST/LATSEQ test_latseq test different part of latseq module
 - "h" : help menu
@@ -321,6 +331,21 @@ in targets/TEST/LATSEQ test_latseq test different part of latseq module
 - "m" : test measurement time to capture 1000000 fingerprints
 - "n" : test measurement time to capture 1000 fingerprints with 1,2,3,5,10 data identifiers
 - "w" : test writer speed for a simplified data collector
+
+## Screenshots
+
+**LatSeq measurement module output file**:
+![LatSeq fingerprints](figures/latseq-fingerprints.png)
+
+**Waterfall in gnuplot**:
+![LatSeq waterfall using gnuplot](figures/latseq-waterfall-gnuplot.png)
+
+**Downlink info metrics**:
+![Downlink infos](figures/downlink_I.png)
+
+**Uplink info metrics**:
+![Uplink infos](figures/uplink_I.png)
+
 
 ## TODO
 - [ ] adapt journey rebuild script to the new data_idenfiters options.

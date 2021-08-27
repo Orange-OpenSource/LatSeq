@@ -34,10 +34,10 @@ class rdtsctots():
         self._cleanup_and_sort()
 
 
-    def self_converted_rdtsc(self) -> bool:
+    def self_converted_rdtsc(self):
         return self.is_converted_rdtsc(self.lines[0])
 
-    def is_converted_rdtsc(self, lineP) -> bool:
+    def is_converted_rdtsc(self, lineP):
         """
             return False if rdtsc else True
         """

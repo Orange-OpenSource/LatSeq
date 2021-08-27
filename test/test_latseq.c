@@ -302,7 +302,7 @@ int main (int argc, char **argv)
   #endif
   if (argc != 2) {
     print_usage();
-    exit(EXIT_FAILURE);
+    exit(-1);
   }
   char opt = (char)argv[1][0];
   switch (opt)
