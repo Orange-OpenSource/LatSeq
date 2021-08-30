@@ -109,6 +109,9 @@ coverage.xml
 .pytest_cache/
 cover/
 
+# Pickle stuff
+*.pkl
+
 # Translations
 *.mo
 *.pot
