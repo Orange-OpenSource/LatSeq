@@ -28,7 +28,7 @@ int test_init_and_close()
 {
   oai_exit = 0;
   printf("[TEST] %s\n",__func__);
-  if(!init_latseq(test_log)) {
+  if(!init_latseq(test_log, 0)) {
     printf("[ERROR] : init_latseq()\n");
     exit(EXIT_FAILURE);
   }
@@ -45,7 +45,7 @@ int test_full()
 {
   oai_exit = 0;
   printf("[TEST] %s\n",__func__);
-  if(!init_latseq(test_log)) {
+  if(!init_latseq(test_log, 0)) {
     printf("[ERROR] : init_latseq()\n");
     exit(EXIT_FAILURE);
   }
@@ -108,7 +108,7 @@ int test_multithread()
 {
   oai_exit = 0;
   printf("[TEST] %s\n",__func__);
-  if(!init_latseq(test_log)) {
+  if(!init_latseq(test_log, 0)) {
     printf("[ERROR] : init_latseq()\n");
     exit(EXIT_FAILURE);
   }
@@ -134,7 +134,7 @@ int measure_log_measure()
 {
   oai_exit = 0;
   printf("[TEST] %s\n",__func__);
-  if(!init_latseq(test_log)) {
+  if(!init_latseq(test_log, 0)) {
     printf("[ERROR] : init_latseq()\n");
     exit(EXIT_FAILURE);
   }
@@ -173,7 +173,7 @@ int measure_log_n()
 {
   oai_exit = 0;
   printf("[TEST] %s\n",__func__);
-  if(!init_latseq(test_log)) {
+  if(!init_latseq(test_log, 0)) {
     printf("[ERROR] : init_latseq()\n");
     exit(EXIT_FAILURE);
   }
