@@ -1,3 +1,37 @@
+diff --git a/.gitignore b/.gitignore
+index b2913b82ae..f775c9f252 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -9,9 +9,29 @@ cmake_targets/nas_sim_tools/build/
+ log/
+ lte_build_oai/
+ targets/bin/
++core
++*.lseq
++*.lcheck
++*.out
++
++# object files
++*.o
++*.obj
++*.orig
+ 
+ # vscode
+ .vscode
++.vscode/launch.json
++
++# python virtual env
++.env
++.venv
++env/
++venv/
++ENV/
++env.bak/
++venv.bak/
++
+ 
+ # Tags for vim/global
+ GPATH
 diff --git a/Makefile b/Makefile
 new file mode 100644
 index 0000000000..bb69e69ac6
@@ -6643,7 +6677,7 @@ index f9a02b1a70..a48f1bcf97 100644
  
      /* XXX - For testing purpose UE always accepts EIA0
 diff --git a/openair3/ocp-gtpu/gtp_itf.cpp b/openair3/ocp-gtpu/gtp_itf.cpp
-index 7b8ba308bf..c4026cbf60 100644
+index 7b8ba308bf..9ee5396170 100644
 --- a/openair3/ocp-gtpu/gtp_itf.cpp
 +++ b/openair3/ocp-gtpu/gtp_itf.cpp
 @@ -19,6 +19,9 @@ extern "C" {
@@ -6662,7 +6696,7 @@ index 7b8ba308bf..c4026cbf60 100644
    pthread_mutex_unlock(&globGtp.gtp_lock);
 +#if LATSEQ
 +  uint16_t ipid = buffer[4] << 8 | buffer[5];
-+  LATSEQ_P("U gtp.out--ip.out","len%d:rnti%d:drb%d.teid%d.gsn%d.ipid0x%x", length, rnti, rab_id - 4, tmp.teid_outgoing, req->seqnum, ipid);
++  LATSEQ_P("U gtp.out--ip.out","len%d:rnti%d:drb%d.teid%d.gsn%d.npdu%d.ipid0x%x", length, rnti, rab_id - 4, tmp.teid_outgoing, tmp.seqNum, tmp.npduNum, ipid);
 +#endif
    gtpv1uCreateAndSendMsg(compatInst(instance),
                           tmp.outgoing_ip_addr,
