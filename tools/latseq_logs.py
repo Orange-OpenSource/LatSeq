@@ -77,9 +77,9 @@ S_TO_MS = 1000
 KWS_BUFFER = ['tx', 'rx', 'retx']  # buffer keywords
 KWS_NO_CONCATENATION = ['pdcp.in']  # TODO
 KWS_IN_D = ['ip.in']  # TODO : put in conf file and verify why when add 'ip' it breaks rebuild
-KWS_OUT_D = ['phy.out.ant']
-KWS_IN_U = ['phy.in.ant']
-KWS_OUT_U = ['ip.out']
+KWS_OUT_D = ['phy.out.proc']
+KWS_IN_U = ['phy.in.proc']
+KWS_OUT_U = ['gtp.out']
 VERBOSITY = False  # Verbosity for rebuild phase False by default
 #
 # UTILS
@@ -973,11 +973,18 @@ class latseq_log:
                     src_point_s = e_tmp[2]
                     while src_point_s not in self.paths[self.journeys[j]['dir']][self.journeys[j]['path']]:
                         src_point_s = '.'.join(src_point_s.split('.')[:-1])
+                        if not src_point_s:  # TODO: error to categorize correctly the path
+                            src_point_s = e_tmp[2]
+                            break
+                    
                     dst_point_s = e_tmp[3]
                     while dst_point_s not in self.paths[self.journeys[j]['dir']][self.journeys[j]['path']]:
                         dst_point_s = '.'.join(dst_point_s.split('.')[:-1])
+                        if not dst_point_s:  # not in this path. TODO: error to categorize correctly the path
+                            dst_point_s = e_tmp[3]
+                            break
+                    
                     tmp_seg = f"{src_point_s}--{dst_point_s}"
-
                     # build out_journeys for lseqj
                     self.out_journeys.append([
                         e_tmp[0],  # [0] : timestamp
@@ -1110,10 +1117,10 @@ class latseq_log:
         Raises:
             ValueError : if the entry in out_journeys is malformed
         """
-        if not hasattr(self, 'out_journeys'):
-            if not self._build_out_journeys():
-                logging.error("latseq_log.yield_out_journeys() : to build out_journeys")
-                exit(-1)
+        # if not hasattr(self, 'out_journeys'):
+        if not self._build_out_journeys():
+            logging.error("latseq_log.yield_out_journeys() : to build out_journeys")
+            exit(-1)
         def _build_header():
             res_str = "#funcId "
             paths = [path for dir in self.get_paths() for path in self.get_paths()[dir]]  # flatten the dict

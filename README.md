@@ -56,12 +56,33 @@ inside the base station.
 - test : test programs
 - tools : tools to process lseq files (analysis part)
 
-## Installation
+## Setup
 
-- Put LatSeq extension source code in OAI code (https://gitlab.eurecom.fr/oai/openairinterface5g). We recommend to put it in the path *common/utils/LATSEQ*.
-- In cmake_targets/CMakeLists.txt add `add_boolean_option(LATSEQ True "Active Latency Sequence tools")` and to `set(UTIL_SRC...` statement : `${OPENAIR_DIR}/common/utils/LATSEQ/latseq.c`
-- Put *test/* into *targets/TEST/LATSEQ/*
-- Verify installation of LatSeq with `make` in *targets/TEST/LATSEQ*
+```bash
+# Get OAI and LatSeq
+git clone https://github.com/Orange-OpenSource/LatSeq
+git clone https://gitlab.eurecom.fr/oai/openairinterface5g oai-latseq
+cd oai-latseq
+git fetch origin
+git checkout 2022.w20
+git apply ../LatSeq/src/latseq_2022w20.patch
+
+# Build OAI with LatSeq
+source oaienv
+./install_external_packages.ubuntu20
+cd cmake_targets
+./build_oai -C
+./build_oai -c --eNB --enable-latseq -w USRP
+
+# Run LTE eNB
+sudo ./cmake_targets/ran_build/build/lte-softmodem -O ci-scripts/conf_files/enb.band7.tm1.50PRB.usrpb210.conf 
+tail -f $(ls -t /tmp/*.lseq | head -1)  # monitor LatSeq fingerprints generation
+```
+
+- LatSeq code is installed in *common/utils/LATSEQ/*
+- *./build\_oai* and *CMakeLists.txt* updated with the path to LatSeq code and compiler option `LATSEQ`
+- LatSeq test codes into *targets/TEST/LATSEQ/*
+
 
 ## Usage
 
@@ -91,7 +112,6 @@ where first argument is the `observed segment` (type D for Downlink, U for Uplin
 3) Convert timestamps of the traces file from `/tmp/appname.date.lseq` with *rdtsctots.py* tool
 3) Process lseq traces to yield data do statistics with LatSeq scripts
 
-More to read in docs/Latseq.pdf
 
 ## LatSeq measurement module
 
@@ -112,19 +132,50 @@ LATSEQ_P with direction of I (Information) observed a scalar property at a point
 
 
 ## LatSeq Analysis module
+
 - **latseq_checker** : verify constitency of Latseq points before compiling
 - **rdtsctots** : convert rdtsc value to unix timestamp value
 - **latseq_logs** : convert lseq log file into useful json file for statistics and visualization
 - **latseq_filter** : filter output of latseq_logs
 - (latseq_stats : perform statistic)
 
+### Usage example
+
+```bash
+cd LatSeq
+
+# Convert lseq to human-readable unix timestamp
+./tools/rdtsctots.py $(ls -t /tmp/*.lseq | head -1) > lte-softmodem.lseq
+
+# Extract contextual information for the uplink and the downlink
+awk -f tools/filter_Is.awk lte-softmodem.lseq
+gnuplot tools/uplink_I.gp
+gnuplot tools/downlink_I.gp
+
+# Rebuild path
+# init the rebuilding instance.
+# Set input and output points in tools/latseq_logs.py
+# with the configuration arrays KWS_IN_D, KWS_OUT_D, KWS_IN_U, KWS_OUT_U
+./tools/latseq_logs.py -l lte-softmodem.lseq  # Advice: filter the traces that are interesting to accelerate rebuilding phase
+# see packet paths found in the traces
+./tools/latseq_logs.py -r -l lte-softmodem.lseq 2>/dev/null  
+# rebuild packet journeys
+./tools/latseq_logs.py -j -l lte-softmodem.lseq 2>/dev/null
+# build the waterfall
+./tools/latseq_logs.py -o -l lte-softmodem.lseq 2>/dev/null > lte-softmodem.lseqj
+cat lte-softmodem.lseqj | ./tools/lseqj2any gp > out.gp
+gnuplot out.gp
+```
+
 ### latseq_checker
+
 Checker to verify that points LATSEQ_P points are consistent.
 Verify the number of argument, the emptiness, format...
 
 ex. `./latseq_checker.sh /home/oai/`
 
 ### rdtsctots
+
 convert rdtsc value to unix timestamp value
 
 ex. `./rdtsctots.py trace_raw.lseq > trace.lseq`
@@ -230,6 +281,7 @@ python3 tools/latseq_logs.py -o -l data/latseq.simple.lseq > simple.lseqj 2>/dev
 ```
 
 ### latseq_filter
+
 Applies a filter to a json stream.
 It uses jq filters.
 Help website to design jq filter : https://jqplay.org/
@@ -244,6 +296,7 @@ cat journeys_downlinks_gsn.lfilter
 ```
 
 ### latseq_stats
+
 Performs statistics from json. Report json or print in stdout.
 
 By default, reads on stdin. "-l" *.lseq will try to open a *.json associated.
@@ -323,6 +376,7 @@ python3 tools/latseq_logs.py -l data/latseq.simple.lseq -j 2>/dev/null | ./tools
 ```
 
 ## TEST_LATSEQ
+
 in targets/TEST/LATSEQ test_latseq test different part of latseq module
 - "h" : help menu
 - "i" : test init and close latseq

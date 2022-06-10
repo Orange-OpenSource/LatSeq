@@ -1,6 +1,5 @@
-#! /bin/sh
+#!/bin/sh
 # -*- mode: Tcl ; tab-width: 8 -*-
-#\
 #################################################################################
 # Software Name : LatSeq
 # Version: 1.0
@@ -15,10 +14,11 @@
 # Software description: Waterfall representation of journey in *.svg or *.gp from *.lseqj
 #################################################################################
 
+#\
 exec tclsh $0 "$@"
 
 proc usage {} {
-    puts stderr {Usage: (lseqj-source-with-human-tstamps) | lseqj2svg (svg|gp) > out.(svg|gp)}
+    puts stderr {Usage: (lseqj-source-with-human-tstamps) | lseqj2any (svg|gp) > out.(svg|gp)}
     exit 1
 }
 
