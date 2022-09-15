@@ -588,10 +588,10 @@ index 179e2de428..22104ae6f9 100755
      else
 diff --git a/common/utils/LATSEQ/README b/common/utils/LATSEQ/README
 new file mode 100644
-index 0000000000..c50d1e249c
+index 0000000000..a3d4f844f6
 --- /dev/null
 +++ b/common/utils/LATSEQ/README
-@@ -0,0 +1,254 @@
+@@ -0,0 +1,264 @@
 +# LATency SEQuence analysis extension for OpenAirInterface
 +
 +A tool for internal latency analysis in Base Station.
@@ -643,8 +643,12 @@ index 0000000000..c50d1e249c
 +
 +Get scripts on https://github.com/Orange-OpenSource/LatSeq/tools
 +
-+- latseq_checker : verify constitency of Latseq points before compiling
++- rdtsctots : convert rdtsc timestamp to unix timestamp value
 +- latseq_logs : convert lseq log file into useful json file for statistics and visualization
++- filter_Is.awk : filter contextual informations
++- lseqj2any : generate waterfall to format gp or svg
++
++- latseq_checker : verify constitency of Latseq points before compiling
 +- latseq_filter : filter output of latseq_logs
 +- latseq_stats : perform statistic
 +
@@ -835,6 +839,12 @@ index 0000000000..c50d1e249c
 +
 +Example of usage of the full toolchain for LatSeq Analysis Module
 +./latseq_logs.py -l ~/latseq.simple.lseq -j 2>/dev/null | ./latseq_filter.sh journeys_downlinks_gsn.lfilt | ./latseq_stats.py -sj --print
++
++### lseqj2any
++
++generate waterfall
++
++cat uplink_burst.30102020_203233.lseqj | lseqj2any gp > uplink_burst.gp
 +
 +## TEST_LATSEQ
 +in targets/TEST/LATSEQ test_latseq test different part of latseq module
@@ -5317,7 +5327,7 @@ index d4f486f761..30a11b7c03 100644
        UE_template_ptr->nb_rb_ul[harq_pid] = rb_table[rb_table_index];
        UE_template_ptr->first_rb_ul[harq_pid] = UE_template_ptr->pre_first_nb_rb_ul;
 diff --git a/openair2/LAYER2/PDCP_v10.1.0/pdcp.c b/openair2/LAYER2/PDCP_v10.1.0/pdcp.c
-index 108a5dbe91..f7f6f34a6f 100644
+index 108a5dbe91..65847d05ce 100644
 --- a/openair2/LAYER2/PDCP_v10.1.0/pdcp.c
 +++ b/openair2/LAYER2/PDCP_v10.1.0/pdcp.c
 @@ -82,6 +82,11 @@ hash_table_t  *pdcp_coll_p = NULL;
@@ -5347,7 +5357,7 @@ index 108a5dbe91..f7f6f34a6f 100644
 +#if LATSEQ
 +      if (!srb_flagP) {
 +        uint16_t ipid = sdu_buffer_pP[4] << 8 | sdu_buffer_pP[5];
-+        LATSEQ_P("D pdcp.in--pdcp.tx","len%d:rnti%d:ipid%x.drb%d.gsn%d.psn%d", sdu_buffer_sizeP, ctxt_pP->rnti, ipid, rb_idP, 0, current_sn);
++        LATSEQ_P("D pdcp.in--pdcp.tx","len%d:rnti%d:ipid0x%x.drb%d.gsn%d.psn%d", sdu_buffer_sizeP, ctxt_pP->rnti, ipid, rb_idP, 0, current_sn);
 +      }
 +#endif
 +
@@ -5362,17 +5372,18 @@ index 108a5dbe91..f7f6f34a6f 100644
    // XXX Decompression would be done at this point
    /*
     * After checking incoming sequence number PDCP header
-@@ -1057,6 +1071,9 @@ pdcp_data_ind(
-             rb_id + 4,
-             sdu_buffer_sizeP - payload_offset );
-       //LOG_T(PDCP,"Sending to GTPV1U %d bytes\n", sdu_buffer_sizeP - payload_offset);
+@@ -1068,6 +1082,10 @@ pdcp_data_ind(
+       GTPV1U_ENB_TUNNEL_DATA_REQ(message_p).offset       = GTPU_HEADER_OVERHEAD_MAX;
+       GTPV1U_ENB_TUNNEL_DATA_REQ(message_p).rnti         = ctxt_pP->rnti;
+       GTPV1U_ENB_TUNNEL_DATA_REQ(message_p).rab_id       = rb_id + 4;
 +#if LATSEQ
-+      LATSEQ_P("U pdcp.rx--gtp.out","len%d:rnti%d:drb%d.psn%d",sdu_buffer_sizeP, ctxt_pP->rnti, rb_id, sequence_number);
++      uint16_t ipid = gtpu_buffer_p[GTPU_HEADER_OVERHEAD_MAX+4] << 8 | gtpu_buffer_p[GTPU_HEADER_OVERHEAD_MAX+5];
++      LATSEQ_P("U pdcp.rx--gtp.out","len%d:rnti%d:drb%d.psn%d.ipid0x%x", sdu_buffer_sizeP, ctxt_pP->rnti, rb_id, sequence_number, ipid);
 +#endif
-       gtpu_buffer_p = itti_malloc(TASK_PDCP_ENB, TASK_GTPV1_U,
-                                   sdu_buffer_sizeP - payload_offset + GTPU_HEADER_OVERHEAD_MAX);
-       AssertFatal(gtpu_buffer_p != NULL, "OUT OF MEMORY");
-@@ -1147,11 +1164,18 @@ pdcp_data_ind(
+       itti_send_msg_to_task(TASK_GTPV1_U, INSTANCE_DEFAULT, message_p);
+       packet_forwarded = TRUE;
+     }
+@@ -1147,11 +1165,18 @@ pdcp_data_ind(
        memcpy(pdcpHead+1,
               &sdu_buffer_pP->data[payload_offset],
               sdu_buffer_sizeP - payload_offset);
@@ -6677,7 +6688,7 @@ index f9a02b1a70..a48f1bcf97 100644
  
      /* XXX - For testing purpose UE always accepts EIA0
 diff --git a/openair3/ocp-gtpu/gtp_itf.cpp b/openair3/ocp-gtpu/gtp_itf.cpp
-index 7b8ba308bf..9ee5396170 100644
+index 7b8ba308bf..1145e52824 100644
 --- a/openair3/ocp-gtpu/gtp_itf.cpp
 +++ b/openair3/ocp-gtpu/gtp_itf.cpp
 @@ -19,6 +19,9 @@ extern "C" {
@@ -6701,14 +6712,15 @@ index 7b8ba308bf..9ee5396170 100644
    gtpv1uCreateAndSendMsg(compatInst(instance),
                           tmp.outgoing_ip_addr,
                           tmp.outgoing_port,
-@@ -895,7 +902,10 @@ static int Gtpv1uHandleGpdu(int h,
+@@ -895,7 +902,11 @@ static int Gtpv1uHandleGpdu(int h,
    const uint32_t sourceL2Id=0;
    const uint32_t destinationL2Id=0;
    pthread_mutex_unlock(&globGtp.gtp_lock);
 -
 +#if LATSEQ
 +  uint16_t ipid = sdu_buffer[4] << 8 | sdu_buffer[5];
-+  LATSEQ_P("D ip.in--pdcp.in", "len%d:rnti%u:ipid0x%x.teid%u.drb%u", sdu_buffer_size, tunnel->second.rnti, ipid, msgHdr->teid, rb_id);
++  //auto teid = inst->ue2te_mapping.find(ntohl(msgHdr->teid))->second.teid_incoming;
++  LATSEQ_P("D ip.in--pdcp.in", "len%d:rnti%u:ipid0x%x.drb%u", sdu_buffer_size, tunnel->second.rnti, ipid, rb_id);
 +#endif
    if(is_gnb && qfi){
      if ( !tunnel->second.callBackSDAP(&ctxt,
