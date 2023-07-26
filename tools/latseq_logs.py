@@ -49,6 +49,8 @@ import pickle
 import simplejson as json
 import decimal
 from tqdm import tqdm
+import concurrent.futures
+import copy
 import logging
 logging.basicConfig(
     level=logging.INFO,
@@ -64,23 +66,25 @@ import rdtsctots
 
 # Reducing search space
 # 4ms treshold to seek the next trace
-DURATION_TO_SEARCH_PKT = decimal.Decimal(0.1)
+DURATION_TO_SEARCH_PKT = decimal.Decimal(0.1) # TODO NOT USED AT THE MOMENT
 # 4ms treshold to find segmentation
-DURATION_TO_SEARCH_FORKS = decimal.Decimal(0.1)
+DURATION_TO_SEARCH_FORKS = decimal.Decimal(0.1) # TODO NOT USED AT THE MOMENT
 # TODO: limit time to search concatenation: or use the properties like size ?
 # DURATION_TO_SEARCH_CONCA = 0.005  # 5ms to find concatenation
-DURATION_TO_SEARCH_RETX = decimal.Decimal(0.01)  # 10ms : Set according to drx-RetransmissionTimerDL RRC config (3GPP-TS38.321) for MAC and max_seq_num for RLC (3GPP-TS38.322)
+DURATION_TO_SEARCH_RETX = decimal.Decimal(0.01) # TODO NOT USED AT THE MOMENT   10ms : Set according to drx-RetransmissionTimerDL RRC config (3GPP-TS38.321) for MAC and max_seq_num for RLC (3GPP-TS38.322)
 
 # decimal.getcontext().prec = 6  # fix precision to 6 (precision of timestamp, then do not be more precise). BE CAREFUL : precision is different to fix place after point
 
 S_TO_MS = 1000
-KWS_BUFFER = ['tx', 'rx', 'retx']  # buffer keywords
-KWS_NO_CONCATENATION = ['pdcp.in']  # TODO
+KWS_BUFFER = []  # buffer keywords, TODO NOT USED AT THE MOMENT
+KWS_NO_CONCATENATION = ['pdcp.in']  # TODO NOT USED AT THE MOMENT
+KWS_NO_SEGMENTATION = [] # full name of all points where segmentation can't happen; the user has to know if segmentation can happen; this improves perfomance as unnecessary search is avoided
 KWS_IN_D = ['ip.in']  # TODO : put in conf file and verify why when add 'ip' it breaks rebuild
 KWS_OUT_D = ['phy.out.proc']
-KWS_IN_U = ['phy.in.proc']
-KWS_OUT_U = ['gtp.out']
-VERBOSITY = False  # Verbosity for rebuild phase False by default
+KWS_IN_U = ['phy.start']
+KWS_OUT_U = ['gtp.out', 'pdcp.discarded.rcvdsmallerdeliv', 'pdcp.discarded.badpdusize', 'pdcp.discarded.integrityfailed', 'macdrop']
+VERBOSITY = True  # Verbosity for rebuild phase False by default
+MULTITHREADING = True
 #
 # UTILS
 #
@@ -552,7 +556,7 @@ class latseq_log:
         """
         self.timestamps = list(map(lambda x: x[0], self.raw_inputs))
 
-    def rebuild_packets_journey_recursively(self):
+    def rebuild_packets_journey_iteratively(self):
         """Rebuild the packets journey from a list of measure recursively
         Algorithm:
             for each input packet, try to rebuild the journey with the next measurements (depth limited)
@@ -564,364 +568,200 @@ class latseq_log:
             journeys (:obj:`dict`): the dictionnary of journey
             out_journeys (:obj:`list`): the list of journeys prepare for output
         """
-        self.journeys = dict()
+        def _initialize_DL_UL_dicts_and_startpoint_list():
+            #  create a List of dictionaries for all start points
+            input_startpoint_list = []
+        
+            # create two dictionaries (one for Uplink, one for Downlink) for all non-starting points, distinguished between Uplink and Downlink
+            input_DL_dict = dict()
+            input_UL_dict = dict()
+            
+            # iterate over all inputs and fill the starting point list and the non-starting point dictionaries
+            for input in self.inputs:
+                if input[2] in KWS_IN_U or input[2] in KWS_IN_D:
+                    input_startpoint_list.append(input)
+                    continue # jump to next input
+
+                is_UL = input[1] # input[1] == 0 -> Downlink; input[1] == 1 -> Uplink
+                if is_UL:
+                    if input[2] in input_UL_dict:
+                        input_UL_dict[input[2]].append(input)
+                    else:
+                        input_UL_dict[input[2]] = []
+                        input_UL_dict[input[2]].append(input)
+                else:
+                    if input[2] in input_DL_dict:
+                        input_DL_dict[input[2]].append(input)
+                    else:
+                        input_DL_dict[input[2]] = []
+                        input_DL_dict[input[2]].append(input)
+            return input_DL_dict, input_UL_dict, input_startpoint_list
+        
+        def _match_ids(point: dict, journey: dict):
+            match_ids = dict()
+            logging_ids = dict()
+            current_local_ids = journey['set_ids']
+            next_local_ids = point[6]
+            for key in next_local_ids.keys():
+                if key in current_local_ids:
+                    if current_local_ids[key] == next_local_ids[key]:
+                        match_ids[key] = current_local_ids[key]
+                    else:
+                        return False, {}, {} # matching failed, return False and empty dicts
+                else:
+                    logging_ids[key] = next_local_ids[key]
+            return True, match_ids, logging_ids # matching successfull, return True and dictionary of neighbouring identifiers (match_ids) and identifiers only in local point (logging_ids)
+
+        def _new_journey(startpoint: dict):
+            journey = dict()
+            journey['completed'] = False
+            journey['no_next_point'] = False
+            journey['next_point'] = startpoint[3]
+            journey['dir'] = startpoint[1]
+            journey['file'] = self.logpath
+            journey['glob'] = startpoint[5]
+            journey['set'] = list()
+            journey['set'].append((self.inputs.index(startpoint), startpoint[0], f"{startpoint[2]}--{startpoint[3]}"))
+            journey['set_ids'] = dict()
+            journey['set_ids'].update(startpoint[6])
+            journey['ts_in'] = startpoint[0]
+            journey['path'] = 0
+            return journey
+
+        def _add_point_to_journey(point: dict, journey:dict):
+            _, match_ids, logging_ids = _match_ids(point, journey)
+            journey['set'].append((self.inputs.index(point), point[0], f"{point[2]}--{point[3]}"))
+            journey['set_ids'].update(match_ids)
+            journey['set_ids'].update(logging_ids)
+            journey['next_point'] = point[3]
+            is_UL = point[1]
+            if is_UL and point[3] in KWS_OUT_U:
+                journey['completed'] = True
+                journey['ts_out'] = point[0]
+            elif not is_UL and point[3] in KWS_OUT_D:
+                journey['completed'] = True
+                journey['ts_out'] = point[0]
+            return journey
+
+        def _get_all_next_points(journey: dict, input_point_list: list):
+            result_point_list = []
+            for point in input_point_list:
+                match, _, _ = _match_ids(point, journey)
+                if match:
+                    result_point_list.append(point)
+                    if point in KWS_NO_SEGMENTATION:
+                        break
+            return result_point_list
+
+        def _are_all_journeys_finished(journeys: list):
+            all_completed_or_no_next_point = True
+            for journey in journeys:
+                if not journey['completed'] and not journey['no_next_point']:
+                    all_completed_or_no_next_point = False
+                    break
+            return all_completed_or_no_next_point
+
+
+        def _rebuild_from_startingpoint_with_direction(startpoint: dict, input_dict: dict):
+            journeys = []
+            journeys.append(_new_journey(startpoint))
+            all_finished = False
+            while not all_finished:
+                len_journeys = len(journeys)
+                for index in range(0, len_journeys):
+                    journey = journeys[index]
+                    if journey['completed'] or journey['no_next_point']:
+                        continue # jump over all journeys, which are already completed or have no next point
+
+                    input_point_list = input_dict[journey['next_point']]
+                    all_next_points = _get_all_next_points(journey, input_point_list)
+                    if not all_next_points:
+                        journey['no_next_point'] = True
+                        continue
+
+                    journey_copied = copy.deepcopy(journey)
+                    for i, point in enumerate(all_next_points):
+                        if i == 0:
+                            journey = _add_point_to_journey(point, journey)
+                        else:
+                            journeys.append(_add_point_to_journey(point, journey_copied))
+
+                all_finished = _are_all_journeys_finished(journeys)
+            return journeys
+                    
+        def _rebuild_from_startingpoint(index: int, startpoint: dict):
+            is_UL = startpoint[1]
+            if index == 43:
+                a = 1
+            if is_UL:
+                journeys_from_startpoint = _rebuild_from_startingpoint_with_direction(startpoint, input_UL_dict)
+            else:
+                journeys_from_startpoint = _rebuild_from_startingpoint_with_direction(startpoint, input_DL_dict)
+            return index, journeys_from_startpoint
+
+        def _save_result(result: list):
+            index = result[0]
+            journeys_from_startpoint = result[1]
+            journey_list_of_lists[index] = journeys_from_startpoint
+
+        def _flatten_journey_list_of_lists():
+            journeys = dict()
+            uid = 0
+            for list_from_startpoint in journey_list_of_lists:
+                for journey in list_from_startpoint:
+                    journey['uid'] = uid
+                    journeys[uid] = journey
+                    uid += 1
+            return journeys
+
+        
+        #############################################################
+        ### START "rebuild_packets_journey_iteratively" algorithm ###
+        #############################################################
+
         # Case: the instance has not been initialized correctly
         if not self.initialized:
             try:
                 self(self.logpath)
             except Exception:
                 raise Exception("Impossible to rebuild packet because this instance of latseq_log has not been initialized correctly")
+                
+        # fill both dictionaries with the inputs filtered by direction, and get list of all starting points in inputs
+        input_DL_dict, input_UL_dict, input_startpoint_list = _initialize_DL_UL_dicts_and_startpoint_list()
         
-        nb_meas = len(self.inputs)  # number of measure in self.inputs
-        info_meas = {}
-        list_meas = list(range(nb_meas))  # list of measures not in a journey
-        if VERBOSITY:
-            pbar = tqdm(range(nb_meas), file=sys.__stderr__)
-        point_added = {}  # point added
-        pointer = 0  # base pointer on the measure in self.inputs for the current journey's input
-        local_pointer = 0  # pointer on the current tested measure candidate for the current journey
+        # create list of indexes for the "_rebuild_from_startingpoint" function
+        indexes = list(range(len(input_startpoint_list)))
 
-        def _measure_ids_in_journey(p_gids: list, p_lids: list, j_gids: list, j_last_element: dict):
-            """Returns the dict of common identifiers if the measure is in the journey
-            Otherwise returns an empty dictionnary
+        # create a list for saving the rebuilded packet paths, each element is a list that saves all packet paths from one starting point
+        journey_list_of_lists = [[] for _ in range(len(input_startpoint_list))]
 
-            Algorithm:
-                All global identifiers should match.
-                All common identifiers' values should match
-            
-            Arguments:
-                p_gids : Trace global ids
-                p_lids : Trace local ids
-                j_gids : Journey global ids
-                j_last_element : Last traces added to journey
-
-            Returns:
-                (list, :obj:`dict`): returns
-                    A list of global ids if journeys global ids empty and trace match
-                    A dict of matched identifiers.
-                    Empty if the point is not in journey (false)
-            """
-            if j_gids:  # if global ids of journeys not empty
-                for k in p_gids:  # for all global ids, first filter
-                    if k in j_gids:
-                        if p_gids[k] != j_gids[k]:
-                            return ()  # False
-                    else:  # The global context id is not in the contet of this journey, continue
-                        return ()  # False
-            res_matched = {}
-            # for all local ids in measurement point
-            for k_lid in p_lids:
-                if k_lid in j_last_element[6]:  # if the local ids are present in the 2 points
-                    # Case : multiple value for the same identifier
-                    if isinstance(j_last_element[6][k_lid], list):
-                        match_local_in_list = False
-                        for v in j_last_element[6][k_lid]:
-                            if p_lids[k_lid] == v:  # We want only one matches the id
-                                match_local_in_list = True
-                                res_matched[k_lid] = v
-                                # remove the multiple value for input to keep only the one used
-                                j_last_element[6][k_lid] = v
-                                break  # for v in j_last_lids[k_lid]
-                        if not match_local_in_list:
-                            return ()
-                    # Case : normal case, one value per identifier
-                    else:
-                        if p_lids[k_lid] != j_last_element[6][k_lid]:  # the local id k_lid do not match
-                            return ()
-                        else:
-                            res_matched[k_lid] = p_lids[k_lid]
-            if not j_gids:  # If no global ids for journeys and trace match
-                return (p_gids, res_matched)
-            else:
-                return ([],res_matched)
-
-        def _get_next(listP: list, endP: int, pointerP: int) -> int:
-            pointerP += 1
-            while pointerP not in listP and pointerP < endP - 1:
-                pointerP += 1
-            return pointerP
-
-        def _rec_rebuild(pointerP: int, local_pointerP: int, parent_journey_id: int):
-            """rebuild journey from a parent measure
-            Args:
-                pointerP (int): the index in inputs of the parent measure
-                local_pointerP (int): the index in inputs of the current measure candidate for the journey
-                parent_journey_id (int): the id of the current journey
-            Returns:
-                bool: if the journey is completed
-            """
-            seg_list = {}
-            # max local pointer to consider. DEPTH_TO_SEARCH impact the algorithm's speed
-            # max_duration_to_search the NEXT fingerprint, not the latency of all journey
-            # max_local_pointer = min(local_pointerP + DEPTH_TO_SEARCH_PKT, nb_meas)
-            max_duration_to_search = self.inputs[pointerP][0] + DURATION_TO_SEARCH_PKT
-            # LOOP: the journey is not completed and we still have local_pointer to consider
-            while not self.journeys[parent_journey_id]['completed'] and local_pointerP < nb_meas and self.inputs[local_pointerP][0] < max_duration_to_search:
-                # if local_pointerP not in list_meas:
-                #     print(f"error at removing : {local_pointerP}")
-                #     continue
-                tmp_p = self.inputs[local_pointerP]
-                # Case: Time treshold to complete journey reached
-                # if tmp_p[0] > max_duration_to_search:
-                #     break
-
-                # Case: wrong direction
-                if tmp_p[1] != self.journeys[parent_journey_id]['dir']:
-                    local_pointerP = _get_next(list_meas, nb_meas, local_pointerP)
-                    continue
-
-                # Case: the measurement point is an input
-                if tmp_p[1] == 0:  # Downlink
-                    if tmp_p[2] in self.pointsInD:
-                        local_pointerP = _get_next(list_meas, nb_meas, local_pointerP)
-                        continue
-                else:  # Uplink
-                    if tmp_p[2] in self.pointsInU:
-                        local_pointerP = _get_next(list_meas, nb_meas, local_pointerP)
-                        continue
-
-                # Case: the measurement point is too far away
-                # and tmp_p[2] not in self.journeys[parent_journey_id]['last_points']
-                if tmp_p[2] not in self.journeys[parent_journey_id]['next_points']:
-                    local_pointerP = _get_next(list_meas, nb_meas, local_pointerP)
-                    continue
-
-                # Case: Concatenation
-                # Do not list_meas.remove(local_pointerP) because of segmentations
-
-                # Case: Normal
-                # Here get the first occurence who is matching
-                matched_ids = _measure_ids_in_journey(
-                    tmp_p[5],
-                    tmp_p[6],
-                    self.journeys[parent_journey_id]['glob'],
-                    self.inputs[self.journeys[parent_journey_id]['set'][-1][0]]
-                )
-                if not matched_ids:
-                    local_pointerP = _get_next(list_meas, nb_meas, local_pointerP)
-                    continue
-
-                # Case: find a match
-                # list_meas.remove(local_pointerP)
-                # sys.stderr.write(f"Add {local_pointerP} to {parent_journey_id}\n")
-                logging.debug(f"Add {local_pointerP} to {parent_journey_id}")
-                if local_pointerP not in point_added:
-                    point_added[local_pointerP] = [parent_journey_id]
-                else:
-                    point_added[local_pointerP].append(parent_journey_id)
-                if matched_ids[0]:
-                    self.journeys[parent_journey_id]['glob'].update(matched_ids[0])
-                seg_local_pointer = _get_next(list_meas, nb_meas, local_pointerP)
-                # Case : search for segmentation
-                # Find all forks possible
-                # seg local pointer to consider for segmentations.
-                #   DEPTH_TO_SEARCH_FORKS impact the algorithm's complexity
-                # max_seg_pointer = min(local_pointerP + DEPTH_TO_SEARCH_FORKS, nb_meas - 1)
-                max_seg_duration = tmp_p[0] + DURATION_TO_SEARCH_FORKS
-                # LOOP: we still have a seg local pointer to consider
-                while seg_local_pointer < nb_meas and self.inputs[seg_local_pointer][0] < max_seg_duration:
-                    seg_tmp_p = self.inputs[seg_local_pointer]
-                    # Case: time treshold reached
-                    # if seg_tmp_p[0] > max_seg_duration:
-                    #    break
-
-                    # Case: wrong direction
-                    if seg_tmp_p[1] != self.journeys[parent_journey_id]['dir']:
-                        seg_local_pointer = _get_next(list_meas, nb_meas, seg_local_pointer)
-                        continue
-                    # Case: the src point are different, not a candidate for segmentation
-                    if seg_tmp_p[2] != tmp_p[2]:
-                        seg_local_pointer = _get_next(list_meas, nb_meas, seg_local_pointer)
-                        continue
-
-                    seg_matched_ids = _measure_ids_in_journey(
-                        seg_tmp_p[5],
-                        seg_tmp_p[6],
-                        self.journeys[parent_journey_id]['glob'],
-                        self.inputs[self.journeys[parent_journey_id]['set'][-1][0]])
-                    # Case: find a match, then a segmentation
-                    if seg_matched_ids:
-                        if local_pointerP not in seg_list:
-                            seg_list[local_pointerP] = {}
-                        seg_list[local_pointerP][seg_local_pointer] = seg_matched_ids[1]
-                        logging.debug(f"Seg {seg_local_pointer} of {local_pointerP} to {parent_journey_id}")
-                        seg_local_pointer = _get_next(list_meas, nb_meas, seg_local_pointer)
-                        continue
-                    seg_local_pointer = _get_next(list_meas, nb_meas, seg_local_pointer)
-                # end while seg_local_pointer < nb_meas
-
-                # At this point, we have completed all the possible fork
-                self.journeys[parent_journey_id]['set'].append((
-                    self.inputs.index(tmp_p),
-                    tmp_p[0],
-                    f"{tmp_p[2]}--{tmp_p[3]}"))
-                self.journeys[parent_journey_id]['set_ids'].update(matched_ids[1])
-
-                # Try to find a path id
-                if isinstance(self.journeys[parent_journey_id]['path'], dict):
-                    paths_to_remove = []
-                    for path in self.journeys[parent_journey_id]['path']:
-                        if self.paths[self.journeys[parent_journey_id]['dir']][path][self.journeys[parent_journey_id]['path'][path]] != tmp_p[2]:
-                            paths_to_remove.append(path)
-                        else:
-                            if len(self.paths[self.journeys[parent_journey_id]['dir']][path]) > 1:
-                                self.journeys[newid]['path'][path] += 1
-                    for ptorm in paths_to_remove:
-                        self.journeys[parent_journey_id]['path'].pop(ptorm)
-                    if len(self.journeys[parent_journey_id]['path']) == 1:  # We find the path id
-                        tmp_path = list(self.journeys[newid]['path'].keys())[0]
-                        del self.journeys[parent_journey_id]['path']
-                        self.journeys[parent_journey_id]['path'] = tmp_path
-
-                if tmp_p[3] in tmpOut:  # this is the last input before the great farewell
-                    self.journeys[parent_journey_id]['next_points'] = None
-                    self.journeys[parent_journey_id]['ts_out'] = tmp_p[0]
-                    self.journeys[parent_journey_id]['completed'] = True
-                    # properties of journey inherit from propertiesof last segment
-                    self.journeys[parent_journey_id]['properties'] = tmp_p[4].copy()
-                else:  # continue to rebuild journey
-                    self.journeys[parent_journey_id]['next_points'] = self.points[tmp_p[2]]['next']
-                    local_pointerP = _get_next(list_meas, nb_meas, local_pointerP)
-            # end while local_pointerP < nb_meas
-
-            # Case: We finished to rebuild the first journey,
-            #   We find segmentation for one or more points
-            #   Retrieves all point of the first journey
-            #   If brother(s) for a point for this first journey
-            #   rebuild new journey from this brother to the end
-            #   Looks like a tree
-            if seg_list and self.journeys[parent_journey_id]['completed']:
-                for p in self.journeys[parent_journey_id]['set']:
-                    if p[0] in seg_list:  # There is a brother
-                        # For all brothers
-                        for s in seg_list[p[0]]:  # seg_local_pointer : seg_matched_ids
-                            # Create a new path
-                            # TODO: what to do when the value is exactly the same ?
-                            seg_p = self.inputs[s]
-                            segid = len(self.journeys)
-                            self.journeys[segid] = deepcopy(self.journeys[parent_journey_id])
-                            self.journeys[segid]['set_ids']['uid'] = str(segid)
-                            # Remove all elements after p
-                            del self.journeys[segid]['set'][self.journeys[segid]['set'].index(p):]
-                            self.journeys[segid]['set'].append((
-                                s,
-                                seg_p[0],
-                                f"{seg_p[2]}--{seg_p[3]}"))
-                            self.journeys[segid]['completed'] = False
-                            self.journeys[segid]['set_ids'].update(seg_list[p[0]][s])
-                            # sys.stderr.write(f"Add {s} to {segid}\n")
-                            if s not in point_added:
-                                point_added[s] = [segid]
-                            else:
-                                point_added[s].append(segid)
-                            # list_meas.remove(seg_local_pointer)
-                            if seg_p[3] in tmpOut:  # this is the last input before the great farewell
-                                self.journeys[segid]['next_points'] = None
-                                self.journeys[segid]['ts_out'] = seg_p[0]
-                                self.journeys[segid]['completed'] = True
-                                continue
-                            self.journeys[segid]['next_points'] = self.points[seg_p[2]]['next']
-                            seg_local_pointer_next = _get_next(list_meas, nb_meas, s)
-                            _rec_rebuild(pointerP, seg_local_pointer_next, segid)
-                            #pointerP = _get_next(list_meas, nb_meas, pointerP)
-
-            return self.journeys[parent_journey_id]['completed']
-
-        # LOOP: for all inputs, try to build the journeys
-        while pointer < nb_meas:
-            # current_i += 1
-            # if current_i % 100 == 0:
-            #     print(f"{current_i} / {total_i}")
-            # if pointer > 2000:
-            #     break
+        # iterate over all startpoints with multithreading, if VERBOSITY prints a progress bar         
+        if MULTITHREADING:
             if VERBOSITY:
-                pbar.n = pointer
-                pbar.refresh()
-            p = self.inputs[pointer]
-            # p[0] float : ts
-            # p[1] int : direction
-            # p[2] str : src point
-            # p[3] str : dst point
-            # p[4] dict : properties ids
-            # p[5] dict : global ids
-            # p[6] dict : local ids
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    zipped_inputs = zip(indexes, input_startpoint_list)
+                    futures = [executor.submit(_rebuild_from_startingpoint, index, startpoint) for index, startpoint in zipped_inputs]
+                    
+                    with tqdm(total=len(futures)) as pbar:
+                        for future in concurrent.futures.as_completed(futures):
+                            _save_result(future.result())
+                            pbar.update(1)
+            else:
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    zipped_inputs = zip(indexes, input_startpoint_list)
+                    futures = [executor.submit(_rebuild_from_startingpoint, index, startpoint) for index, startpoint in zipped_inputs]
+                    
+                    for future in concurrent.futures.as_completed(futures):
+                        _save_result(future.result())
+        else:
+            pbar = tqdm(total=len(input_startpoint_list))
+            for index, startpoint in enumerate(input_startpoint_list):
+                result = _rebuild_from_startingpoint(index, startpoint)
+                _save_result(result)
+                pbar.update(1)
 
-            # Get the correct set of IN/OUT for the current direction
-            if p[1] == 0:  # Downlink
-                tmpIn = self.pointsInD
-                tmpOut = self.pointsOutD
-            else:  # Uplink
-                tmpIn = self.pointsInU
-                tmpOut = self.pointsOutU
+        self.journeys = _flatten_journey_list_of_lists()
 
-            # Case: the current measure is not an input measure, continue
-            if p[2] not in tmpIn:
-                pointer = _get_next(list_meas, nb_meas, pointer)
-                continue
-
-            # this is a packet in arrival, create a new journey
-            newid = len(self.journeys)
-            self.journeys[newid] = dict()
-            self.journeys[newid]['dir'] = p[1]  # direction for this journey
-            self.journeys[newid]['glob'] = p[5]  # global ids as a first filter
-            self.journeys[newid]['ts_in'] = p[0]  # timestamp of arrival
-            self.journeys[newid]['set'] = list()  # set of measurements ids and properties (tuple())
-            # self.journeys[newid]['set'][0] : id dans inputs
-            # self.journeys[newid]['set'][1] : ts for this input
-            # self.journeys[newid]['set'][2] : corresponding segment
-            self.journeys[newid]['set'].append((
-                self.inputs.index(p),
-                p[0],
-                f"{p[2]}--{p[3]}"))
-            self.journeys[newid]['set_ids'] = dict()  # dict of local ids
-            self.journeys[newid]['set_ids'] = {'uid': str(newid)}
-            self.journeys[newid]['set_ids'].update(p[6])
-            self.journeys[newid]['next_points'] = self.points[p[2]]['next']  # list of possible next points
-            if self.journeys[newid]['set'][-1][0] not in point_added:
-                point_added[self.journeys[newid]['set'][-1][0]] = [newid]
-            # path number of this journey according to self.paths
-            if not hasattr(self, 'paths'):  # Paths not construct, it should because it is done at init
-                self.journeys[newid]['completed'] = False
-                continue
-            self.journeys[newid]['path'] = dict()  # list of index on path lists
-            for path in range(len(self.paths[self.journeys[newid]['dir']])):
-                self.journeys[newid]['path'][path] = 0
-            paths_to_remove = []
-            for path in self.journeys[newid]['path']:
-                if self.paths[self.journeys[newid]['dir']][path][self.journeys[newid]['path'][path]] != p[2]:
-                    paths_to_remove.append(path)
-                else:
-                    if len(self.paths[self.journeys[newid]['dir']][path]) > 1:
-                        self.journeys[newid]['path'][path] += 1
-            for ptorm in paths_to_remove:
-                self.journeys[newid]['path'].pop(ptorm)
-            if len(self.journeys[newid]['path']) == 1:  # We find the path id
-                tmp_path = list(self.journeys[newid]['path'].keys())[0]
-                del self.journeys[newid]['path']
-                self.journeys[newid]['path'] = tmp_path
-            # self.journeys[newid]['last_points'] = [p[2]]
-            self.journeys[newid]['completed'] = False  # True if the journey is complete
-            # list_meas.remove(pointer)  # Remove from the list
-            local_pointer = _get_next(list_meas, nb_meas, pointer)
-            # Try to rebuild the journey from this packet
-            # Assumption: the measures are ordered by timestamp,
-            #   means that the next point is necessary after the current
-            #   input point in the list of inputs
-
-            # TODO : Give a list of measurement to consider instead of local pointer only ?
-            _rec_rebuild(pointer, local_pointer, newid)
-            pointer = _get_next(list_meas, nb_meas, pointer)
-
-        # Remove all useless journeys dict keys for the next
-        tmp_file = self.logpath
-        for k in self.journeys:
-            self.journeys[k]['uid'] = self.journeys[k]['set_ids']['uid']
-            del self.journeys[k]['next_points']
-            self.journeys[k]['file'] = tmp_file
-            if isinstance(self.journeys[k]['path'], dict):
-                self.journeys[k]['completed'] = False
-        if VERBOSITY:
-            pbar.close()
         # Store latseq_logs object
         self.store_object()
         # build out_journeys
@@ -967,7 +807,7 @@ class latseq_log:
                 e_tmp = self.inputs[e[0]]  # Get the point in the inputs list
                 if e[0] not in added_out_j:  # create a new entry for this point in out journeys
                     added_out_j[e[0]] = len(self.out_journeys)
-                    tmp_uid = self.journeys[j]['set_ids']['uid']
+                    tmp_uid = self.journeys[j]['uid']
                     tmp_str = f"uid{tmp_uid}:{dict_ids_to_str(self.journeys[j]['glob'])}.{dict_ids_to_str(e_tmp[6])}"
                     # have segment corresponding to journey's path
                     src_point_s = e_tmp[2]
@@ -993,7 +833,7 @@ class latseq_log:
                         e_tmp[4],  # [3] : properties
                         tmp_str])  # [4] : data id
                 else:  # update the current entry
-                    self.out_journeys[added_out_j[e[0]]][4] = f"uid{self.journeys[j]['set_ids']['uid']}." + self.out_journeys[added_out_j[e[0]]][4]
+                    self.out_journeys[added_out_j[e[0]]][4] = f"uid{self.journeys[j]['uid']}." + self.out_journeys[added_out_j[e[0]]][4]
 
                 # points latency
                 tmp_point = self.points[e_tmp[2]]
@@ -1101,7 +941,7 @@ class latseq_log:
         try:
             if not hasattr(self, 'journeys'):
                 try:
-                    self.rebuild_packets_journey_recursively()
+                    self.rebuild_packets_journey_iteratively()
                 except Exception:
                     raise Exception("[ERROR] to rebuild journeys")
             for j in self.journeys:
