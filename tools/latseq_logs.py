@@ -50,6 +50,9 @@ import simplejson as json
 import decimal
 from tqdm import tqdm
 import concurrent.futures
+import multiprocessing
+from itertools import cycle
+from rebuild_journeys import rebuild_from_startingpoint
 import copy
 import logging
 logging.basicConfig(
@@ -83,8 +86,8 @@ KWS_IN_D = ['ip.in']  # TODO : put in conf file and verify why when add 'ip' it 
 KWS_OUT_D = ['phy.out.proc']
 KWS_IN_U = ['phy.start']
 KWS_OUT_U = ['gtp.out', 'pdcp.discarded.rcvdsmallerdeliv', 'pdcp.discarded.badpdusize', 'pdcp.discarded.integrityfailed', 'macdrop']
-VERBOSITY = True  # Verbosity for rebuild phase False by default
-MULTITHREADING = True
+VERBOSITY = False  # Verbosity for rebuild phase False by default
+MULTIPROCESSING = True
 #
 # UTILS
 #
@@ -185,7 +188,7 @@ class latseq_log:
                 journeys[i]['ts_in'] (float): timestamp at which the journey begins
                 journeys[i]['ts_out'] (float): timestamp at which the journey ends if `completed`
                 journeys[i]['next_points'] (:obj:`list`): the next points' identifier expected
-                journeys[i]['set'] (:obj:`list` of :obj:`tuple`): list of measures 
+                journeys[i]['set']inputs: list (:obj:`list` of :obj:`tuple`): list of measures 
                     journeys[i]['set'][s][0] (int): corresponding id in `input`
                     journeys[i]['set'][s][1] (float): timestamp
                     journeys[i]['set'][s][2] (string): segment
@@ -596,108 +599,6 @@ class latseq_log:
                         input_DL_dict[input[2]] = []
                         input_DL_dict[input[2]].append(input)
             return input_DL_dict, input_UL_dict, input_startpoint_list
-        
-        def _match_ids(point: dict, journey: dict):
-            match_ids = dict()
-            logging_ids = dict()
-            current_local_ids = journey['set_ids']
-            next_local_ids = point[6]
-            for key in next_local_ids.keys():
-                if key in current_local_ids:
-                    if current_local_ids[key] == next_local_ids[key]:
-                        match_ids[key] = current_local_ids[key]
-                    else:
-                        return False, {}, {} # matching failed, return False and empty dicts
-                else:
-                    logging_ids[key] = next_local_ids[key]
-            return True, match_ids, logging_ids # matching successfull, return True and dictionary of neighbouring identifiers (match_ids) and identifiers only in local point (logging_ids)
-
-        def _new_journey(startpoint: dict):
-            journey = dict()
-            journey['completed'] = False
-            journey['no_next_point'] = False
-            journey['next_point'] = startpoint[3]
-            journey['dir'] = startpoint[1]
-            journey['file'] = self.logpath
-            journey['glob'] = startpoint[5]
-            journey['set'] = list()
-            journey['set'].append((self.inputs.index(startpoint), startpoint[0], f"{startpoint[2]}--{startpoint[3]}"))
-            journey['set_ids'] = dict()
-            journey['set_ids'].update(startpoint[6])
-            journey['ts_in'] = startpoint[0]
-            journey['path'] = 0
-            return journey
-
-        def _add_point_to_journey(point: dict, journey:dict):
-            _, match_ids, logging_ids = _match_ids(point, journey)
-            journey['set'].append((self.inputs.index(point), point[0], f"{point[2]}--{point[3]}"))
-            journey['set_ids'].update(match_ids)
-            journey['set_ids'].update(logging_ids)
-            journey['next_point'] = point[3]
-            is_UL = point[1]
-            if is_UL and point[3] in KWS_OUT_U:
-                journey['completed'] = True
-                journey['ts_out'] = point[0]
-            elif not is_UL and point[3] in KWS_OUT_D:
-                journey['completed'] = True
-                journey['ts_out'] = point[0]
-            return journey
-
-        def _get_all_next_points(journey: dict, input_point_list: list):
-            result_point_list = []
-            for point in input_point_list:
-                match, _, _ = _match_ids(point, journey)
-                if match:
-                    result_point_list.append(point)
-                    if point in KWS_NO_SEGMENTATION:
-                        break
-            return result_point_list
-
-        def _are_all_journeys_finished(journeys: list):
-            all_completed_or_no_next_point = True
-            for journey in journeys:
-                if not journey['completed'] and not journey['no_next_point']:
-                    all_completed_or_no_next_point = False
-                    break
-            return all_completed_or_no_next_point
-
-
-        def _rebuild_from_startingpoint_with_direction(startpoint: dict, input_dict: dict):
-            journeys = []
-            journeys.append(_new_journey(startpoint))
-            all_finished = False
-            while not all_finished:
-                len_journeys = len(journeys)
-                for index in range(0, len_journeys):
-                    journey = journeys[index]
-                    if journey['completed'] or journey['no_next_point']:
-                        continue # jump over all journeys, which are already completed or have no next point
-
-                    input_point_list = input_dict[journey['next_point']]
-                    all_next_points = _get_all_next_points(journey, input_point_list)
-                    if not all_next_points:
-                        journey['no_next_point'] = True
-                        continue
-
-                    journey_copied = copy.deepcopy(journey)
-                    for i, point in enumerate(all_next_points):
-                        if i == 0:
-                            journey = _add_point_to_journey(point, journey)
-                        else:
-                            journeys.append(_add_point_to_journey(point, journey_copied))
-
-                all_finished = _are_all_journeys_finished(journeys)
-            return journeys
-                    
-        def _rebuild_from_startingpoint(index: int, startpoint: dict):
-            is_UL = startpoint[1]
-            if index == 43:
-                a = 1
-            if is_UL:
-                journeys_from_startpoint = _rebuild_from_startingpoint_with_direction(startpoint, input_UL_dict)
-            else:
-                journeys_from_startpoint = _rebuild_from_startingpoint_with_direction(startpoint, input_DL_dict)
-            return index, journeys_from_startpoint
 
         def _save_result(result: list):
             index = result[0]
@@ -736,29 +637,12 @@ class latseq_log:
         journey_list_of_lists = [[] for _ in range(len(input_startpoint_list))]
 
         # iterate over all startpoints with multithreading, if VERBOSITY prints a progress bar         
-        if MULTITHREADING:
-            if VERBOSITY:
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    zipped_inputs = zip(indexes, input_startpoint_list)
-                    futures = [executor.submit(_rebuild_from_startingpoint, index, startpoint) for index, startpoint in zipped_inputs]
-                    
-                    with tqdm(total=len(futures)) as pbar:
-                        for future in concurrent.futures.as_completed(futures):
-                            _save_result(future.result())
-                            pbar.update(1)
-            else:
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    zipped_inputs = zip(indexes, input_startpoint_list)
-                    futures = [executor.submit(_rebuild_from_startingpoint, index, startpoint) for index, startpoint in zipped_inputs]
-                    
-                    for future in concurrent.futures.as_completed(futures):
-                        _save_result(future.result())
-        else:
-            pbar = tqdm(total=len(input_startpoint_list))
-            for index, startpoint in enumerate(input_startpoint_list):
-                result = _rebuild_from_startingpoint(index, startpoint)
-                _save_result(result)
-                pbar.update(1)
+        if __name__ == "__main__":
+            num_cores = multiprocessing.cpu_count()
+            pool = multiprocessing.Pool(processes=num_cores)
+            results = pool.starmap(rebuild_from_startingpoint, zip(indexes, input_startpoint_list, cycle([input_UL_dict]), cycle([input_DL_dict]), cycle([self.inputs])))
+            pool.close()
+            pool.join()
 
         self.journeys = _flatten_journey_list_of_lists()
 
