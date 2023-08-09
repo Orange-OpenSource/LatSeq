@@ -49,7 +49,6 @@ import pickle
 import simplejson as json
 import decimal
 from tqdm import tqdm
-import concurrent.futures
 import multiprocessing
 from itertools import cycle
 import copy
@@ -68,7 +67,7 @@ import rdtsctots
 
 # Reducing search space
 # 4ms treshold to seek the next trace
-DURATION_TO_SEARCH_PKT = decimal.Decimal(0.1) # TODO NOT USED AT THE MOMENT
+DURATION_TO_SEARCH_PKT = decimal.Decimal(0.04) # USED to avoid accidental mismatch of points which are too far apart in the time domain, 0.05 are 50ms
 # 4ms treshold to find segmentation
 DURATION_TO_SEARCH_FORKS = decimal.Decimal(0.1) # TODO NOT USED AT THE MOMENT
 # TODO: limit time to search concatenation: or use the properties like size ?
@@ -84,7 +83,7 @@ KWS_NO_SEGMENTATION = [] # full name of all points where segmentation can't happ
 KWS_IN_D = ['ip.in']  # TODO : put in conf file and verify why when add 'ip' it breaks rebuild
 KWS_OUT_D = ['phy.out.proc']
 KWS_IN_U = ['phy.start']
-KWS_OUT_U = ['gtp.out', 'pdcp.discarded.rcvdsmallerdeliv', 'pdcp.discarded.badpdusize', 'pdcp.discarded.integrityfailed', 'macdrop']
+KWS_OUT_U = ['gtp.out', 'pdcp.discarded.rcvdsmallerdeliv', 'pdcp.discarded.badpdusize', 'pdcp.discarded.integrityfailed', 'mac.retxdrop']
 VERBOSITY = False  # Verbosity for rebuild phase False by default; only shows progress bar when MULTIPROCESSING is False
 MULTIPROCESSING = True
 #
@@ -667,10 +666,16 @@ class latseq_log:
                 journey['completed'] = True
                 journey['ts_out'] = point[0]
             return journey
+        
+        def get_latest_timestamp(self, journey: dict):
+            return journey['set'][-1][1]
 
         def _get_all_next_points(self, journey: dict, input_point_list: list):
             result_point_list = []
             for point in input_point_list:
+                if point[0]-self.get_latest_timestamp(journey) < 0 or point[0]-self.get_latest_timestamp(journey) > DURATION_TO_SEARCH_PKT:
+                    continue    # jump over all points that are younger than latest part of journey or too far in the future to avoid accidental mismatches
+
                 match, _, _ = self._match_ids(point, journey)
                 if match:
                     result_point_list.append(point)
@@ -697,8 +702,7 @@ class latseq_log:
             journeys.append(self._new_journey(startpoint))
             all_finished = False
             while not all_finished:
-                len_journeys = len(journeys)
-                for index in range(0, len_journeys):
+                for index in range(0, len(journeys)):    # for journey in journeys is not used since we append to journeys in the for loop and this can mess up the for-loop
                     journey = journeys[index]
                     if journey['completed'] or journey['no_next_point']:
                         continue # jump over all journeys, which are already completed or have no next point
@@ -709,12 +713,12 @@ class latseq_log:
                         journey['no_next_point'] = True
                         continue
 
-                    journey_copied = copy.deepcopy(journey)
+                    journey_copied = copy.deepcopy(journey) # deep copy is used for creating the segmentation journeys
                     for i, point in enumerate(all_next_points):
                         if i == 0:
                             journey = self._add_point_to_journey(point, journey)
                         else:
-                            journeys.append(self._add_point_to_journey(point, journey_copied))
+                            journeys.append(self._add_point_to_journey(point, copy.deepcopy(journey_copied)))
 
                 all_finished = self._are_all_journeys_finished(journeys)
             return journeys
@@ -724,6 +728,10 @@ class latseq_log:
                 uid = 0
                 for list_from_startpoint in lst_of_lsts:
                     for journey in list_from_startpoint:
+                        if 'no_next_point' in journey:
+                            del journey['no_next_point']
+                        if 'next_point' in journey:
+                            del journey['next_point']
                         journey['uid'] = uid
                         journeys_dict[uid] = journey
                         uid += 1
