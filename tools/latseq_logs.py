@@ -84,7 +84,7 @@ KWS_IN_D = ['ip.in']  # TODO : put in conf file and verify why when add 'ip' it 
 KWS_OUT_D = ['phy.out.proc']
 KWS_IN_U = ['phy.start']
 KWS_OUT_U = ['gtp.out', 'pdcp.discarded.rcvdsmallerdeliv', 'pdcp.discarded.badpdusize', 'pdcp.discarded.integrityfailed', 'mac.retxdrop']
-VERBOSITY = False  # Verbosity for rebuild phase False by default; only shows progress bar when MULTIPROCESSING is False
+VERBOSITY = True  # Verbosity for rebuild phase False by default; only shows progress bar when MULTIPROCESSING is False
 MULTIPROCESSING = True
 #
 # UTILS
@@ -562,18 +562,26 @@ class latseq_log:
             self.logpath = logpath
             self.use_multiprocessing = use_multiprocessing
             self.inputs = inputs
-            self.input_DL_dict, self.input_UL_dict, self.startpoint_list = self._init_DL_UL_dicts_and_startpoint_lst()
+            self.input_DL_dict, self.input_UL_dict, self.startpoint_list = self._init_DL_UL_dicts_and_startpoint_list()
             self.indexes_lst = list(range(len(self.startpoint_list)))
 
-        def rebuild_journeys(self):
+        def rebuild_journeys(self) -> dict:
+            """rebuild function that will be called from outside the class;
+            uses mutliprocessing or singleprocessing depending on the self.use_multiprocessing flag;
+            returns a dict of all journeys as values and integer indexes as keys
+            """
             if self.use_multiprocessing:
                 results = self._rebuild_multiprocess()
-                return self._flatten_list_of_lists(results)
+                return self._flatten_list_of_lists_to_dict(results)
             else:
                 results = self._rebuild_singleprocess()
-                return self._flatten_list_of_lists(results)
+                return self._flatten_list_of_lists_to_dict(results)
         
-        def _rebuild_singleprocess(self):
+        def _rebuild_singleprocess(self) -> list:
+            """rebuilds all journeys from self.startpointlist in an iterative way using a single process
+
+            if VERBOSITY is true then a progress bar is printed to stderr
+            """
             results = []
             if VERBOSITY:
                 with tqdm(total=len(self.startpoint_list),file=sys.stderr) as pbar:
@@ -585,16 +593,24 @@ class latseq_log:
                     results.append(self._rebuild_from_startingpoint(startpoint))
             return results
             
-        def _rebuild_multiprocess(self):
+        def _rebuild_multiprocess(self) -> list:
+            """rebuilds all journeys from self.startpointlist in an iterative way using all cores for multiprocessing
+            if VERBOSITY is true then a warning is printed to stderr that VERBOSITY is only working in single processing
+            """
+            if VERBOSITY:
+                logging.warning("VERBOSITY only works without multiprocessing, continuing without VERBOSITY")
             pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
             results = pool.map(self._rebuild_from_startingpoint, self.startpoint_list)
             pool.close()
             pool.join()
             return results
         
-        def _init_DL_UL_dicts_and_startpoint_lst(self):
-            #  create a List of dictionaries for all start points
-            input_startpoint_list = []
+        def _init_DL_UL_dicts_and_startpoint_list(self) -> tuple[dict, dict, list]:
+            """initializes and returns the list that contains all startpoints according to KWS_IN_D/KWS_IN_U;
+            initializes and returns two dictionaries that contain all non-startpoints separated by Uplink/Downlink with the name of the point as the key
+            """
+            #  create a list of dictionaries for all startpoints
+            startpoint_list = []
         
             # create two dictionaries (one for Uplink, one for Downlink) for all non-starting points, distinguished between Uplink and Downlink
             input_DL_dict = dict()
@@ -603,7 +619,7 @@ class latseq_log:
             # iterate over all inputs and fill the starting point list and the non-starting point dictionaries
             for input in self.inputs:
                 if input[2] in KWS_IN_U or input[2] in KWS_IN_D:
-                    input_startpoint_list.append(input)
+                    startpoint_list.append(input)
                     continue # jump to next input
 
                 is_UL = input[1] # input[1] == 0 -> Downlink; input[1] == 1 -> Uplink
@@ -619,9 +635,15 @@ class latseq_log:
                     else:
                         input_DL_dict[input[2]] = []
                         input_DL_dict[input[2]].append(input)
-            return input_DL_dict, input_UL_dict, input_startpoint_list
+            return input_DL_dict, input_UL_dict, startpoint_list
 
-        def _match_ids(self, point: dict, journey: dict):
+        def _match_ids(self, point: dict, journey: dict) -> tuple[bool, dict, dict]:
+            """checks if the fingerprint IDs of the lastest point from the journey are matching the IDs of a point;
+            if the names of the fingerprints match but the values are different then the matching failed and a False and empty dictionaries are returned;
+            if the names and values of the fingerprints match then a True and two dictionaries are returned, the first dictionary contains all fingerprints and values
+            that can be used to match the points, the second dictionary contains the fingerprints and values of point that do not show up in the latest point of the journey
+            these are saved for logging reasons
+            """
             match_ids = dict()
             logging_ids = dict()
             current_local_ids = journey['set_ids']
@@ -636,7 +658,9 @@ class latseq_log:
                     logging_ids[key] = next_local_ids[key]
             return True, match_ids, logging_ids # matching successfull, return True and dictionary of neighbouring identifiers (match_ids) and identifiers only in local point (logging_ids)
 
-        def _new_journey(self, startpoint: dict):
+        def _new_journey(self, startpoint: dict) -> dict:
+            """creates and returns a new dictionary of a journey from a startpoint
+            """
             journey = dict()
             journey['completed'] = False
             journey['no_next_point'] = False
@@ -652,7 +676,10 @@ class latseq_log:
             journey['path'] = 0
             return journey
 
-        def _add_point_to_journey(self, point: dict, journey:dict):
+        def _add_point_to_journey(self, point: dict, journey:dict) -> dict:
+            """adds a new point to an existing journey and checks if this journey is now finished according to KWS_OUT_D/KWS_OUT_U, also updates the IDs of the journey;
+            returns the existing journey with point added
+            """
             _, match_ids, logging_ids = self._match_ids(point, journey)
             journey['set'].append((self.inputs.index(point), point[0], f"{point[2]}--{point[3]}"))
             journey['set_ids'].update(match_ids)
@@ -667,10 +694,16 @@ class latseq_log:
                 journey['ts_out'] = point[0]
             return journey
         
-        def get_latest_timestamp(self, journey: dict):
+        def get_latest_timestamp(self, journey: dict) -> decimal:
+            """ returns the latest timestamp from a journey
+            """
             return journey['set'][-1][1]
 
-        def _get_all_next_points(self, journey: dict, input_point_list: list):
+        def _get_matched_next_points(self, journey: dict, input_point_list: list) -> list:
+            """returns a list of all points that continue the journey;
+            accidental mismatches are avoided by limiting the time intervall of the next points to [0, DURATION_TO_SEARCH_PKT]
+            relative to the lastes timestamp in the journey
+            """
             result_point_list = []
             for point in input_point_list:
                 if point[0]-self.get_latest_timestamp(journey) < 0 or point[0]-self.get_latest_timestamp(journey) > DURATION_TO_SEARCH_PKT:
@@ -683,7 +716,10 @@ class latseq_log:
                         break
             return result_point_list
 
-        def _are_all_journeys_finished(self, journeys: list):
+        def _are_all_journeys_finished(self, journeys: list) -> bool:
+            """returns if all journeys which come from one startingpoint are finished;
+            a journey is finished when the lastest point is in KWS_OUT_D/KWS_OUT_U or there is not a single point that continues the journey
+            """
             all_completed_or_no_next_point = True
             for journey in journeys:
                 if not journey['completed'] and not journey['no_next_point']:
@@ -692,7 +728,10 @@ class latseq_log:
             return all_completed_or_no_next_point
 
 
-        def _rebuild_from_startingpoint(self, startpoint: dict):
+        def _rebuild_from_startingpoint(self, startpoint: dict) -> list:
+            """takes a startpoint and returns a list of all journeys that come from that startpoint;
+            one startpoint creates more than one journey if there is segmentation
+            """
             is_UL = startpoint[1]
             if is_UL:
                 input_dict = self.input_UL_dict
@@ -702,40 +741,43 @@ class latseq_log:
             journeys.append(self._new_journey(startpoint))
             all_finished = False
             while not all_finished:
-                for index in range(0, len(journeys)):    # for journey in journeys is not used since we append to journeys in the for loop and this can mess up the for-loop
+                for index in range(0, len(journeys)):    # "for journey in journeys" is not used since we append to journeys in the for loop and this can mess up the for loop
                     journey = journeys[index]
                     if journey['completed'] or journey['no_next_point']:
                         continue # jump over all journeys, which are already completed or have no next point
 
-                    input_point_list = input_dict[journey['next_point']]
-                    all_next_points = self._get_all_next_points(journey, input_point_list)
-                    if not all_next_points:
+                    all_next_points_list = input_dict[journey['next_point']]
+                    matched_next_points = self._get_matched_next_points(journey, all_next_points_list)
+                    if not matched_next_points:
                         journey['no_next_point'] = True
                         continue
 
-                    journey_copied = copy.deepcopy(journey) # deep copy is used for creating the segmentation journeys
-                    for i, point in enumerate(all_next_points):
+                    journey_copied = deepcopy(journey) # deep copy is used for creating the segmentation journeys
+                    for i, point in enumerate(matched_next_points):
                         if i == 0:
                             journey = self._add_point_to_journey(point, journey)
                         else:
-                            journeys.append(self._add_point_to_journey(point, copy.deepcopy(journey_copied)))
+                            journeys.append(self._add_point_to_journey(point, deepcopy(journey_copied)))
 
                 all_finished = self._are_all_journeys_finished(journeys)
             return journeys
         
-        def _flatten_list_of_lists(self, lst_of_lsts: list):
-                journeys_dict = dict()
-                uid = 0
-                for list_from_startpoint in lst_of_lsts:
-                    for journey in list_from_startpoint:
-                        if 'no_next_point' in journey:
-                            del journey['no_next_point']
-                        if 'next_point' in journey:
-                            del journey['next_point']
-                        journey['uid'] = uid
-                        journeys_dict[uid] = journey
-                        uid += 1
-                return journeys_dict
+        def _flatten_list_of_lists_to_dict(self, lst_of_lsts: list):
+            """the rebuild algorithm returns the journeys as a list of lists, but for further processing the latseq log programm needs a dictionary,
+            therefore this algorithm flattens the list of lists and creates a dictionary with indexes as keys and the journeys as values  and returns this dict 
+            """
+            journeys_dict = dict()
+            uid = 0
+            for list_from_startpoint in lst_of_lsts:
+                for journey in list_from_startpoint:
+                    if 'no_next_point' in journey:
+                        del journey['no_next_point']
+                    if 'next_point' in journey:
+                        del journey['next_point']
+                    journey['uid'] = uid
+                    journeys_dict[uid] = journey
+                    uid += 1
+            return journeys_dict
 
     def rebuild_packets_journey_iteratively(self):
         """Rebuild the packets journey from a list of measure recursively
@@ -750,10 +792,6 @@ class latseq_log:
             out_journeys (:obj:`list`): the list of journeys prepare for output
         """
         
-        #############################################################
-        ### START "rebuild_packets_journey_iteratively" algorithm ###
-        #############################################################
-
         # Case: the instance has not been initialized correctly
         if not self.initialized:
             try:
@@ -761,10 +799,7 @@ class latseq_log:
             except Exception:
                 raise Exception("Impossible to rebuild packet because this instance of latseq_log has not been initialized correctly")
 
-        if MULTIPROCESSING:
-            Rebuild_Class = self.RebuildJourneys(use_multiprocessing=True, inputs=self.inputs, logpath=self.logpath)
-        else:
-            Rebuild_Class = self.RebuildJourneys(use_multiprocessing=False, inputs=self.inputs, logpath=self.logpath)
+        Rebuild_Class = self.RebuildJourneys(use_multiprocessing=MULTIPROCESSING, inputs=self.inputs, logpath=self.logpath)
         self.journeys = Rebuild_Class.rebuild_journeys()
         self.store_object()
         self._build_out_journeys()
