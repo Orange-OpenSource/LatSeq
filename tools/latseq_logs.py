@@ -646,7 +646,7 @@ class latseq_log:
             """
             match_ids = dict()
             logging_ids = dict()
-            current_local_ids = journey['set_ids']
+            current_local_ids = journey['last_point_added'][6]
             next_local_ids = point[6]
             for key in next_local_ids.keys():
                 if key in current_local_ids:
@@ -674,6 +674,7 @@ class latseq_log:
             journey['set_ids'].update(startpoint[6])
             journey['ts_in'] = startpoint[0]
             journey['path'] = 0
+            journey['last_point_added'] = startpoint
             return journey
 
         def _add_point_to_journey(self, point: dict, journey:dict) -> dict:
@@ -681,6 +682,7 @@ class latseq_log:
             returns the existing journey with point added
             """
             _, match_ids, logging_ids = self._match_ids(point, journey)
+            journey['last_point_added'] = point
             journey['set'].append((self.inputs.index(point), point[0], f"{point[2]}--{point[3]}"))
             journey['set_ids'].update(match_ids)
             journey['set_ids'].update(logging_ids)
@@ -733,10 +735,7 @@ class latseq_log:
             one startpoint creates more than one journey if there is segmentation
             """
             is_UL = startpoint[1]
-            if is_UL:
-                input_dict = self.input_UL_dict
-            else:
-                input_dict = self.input_DL_dict
+            input_dict = self.input_UL_dict if is_UL else self.input_DL_dict
             journeys = []
             journeys.append(self._new_journey(startpoint))
             all_finished = False
@@ -754,9 +753,9 @@ class latseq_log:
 
                     journey_copied = deepcopy(journey) # deep copy is used for creating the segmentation journeys
                     for i, point in enumerate(matched_next_points):
-                        if i == 0:
+                        if i == 0: # continuation of original journey
                             journey = self._add_point_to_journey(point, journey)
-                        else:
+                        else: # segmentation from original journey
                             journeys.append(self._add_point_to_journey(point, deepcopy(journey_copied)))
 
                 all_finished = self._are_all_journeys_finished(journeys)
@@ -770,10 +769,9 @@ class latseq_log:
             uid = 0
             for list_from_startpoint in lst_of_lsts:
                 for journey in list_from_startpoint:
-                    if 'no_next_point' in journey:
-                        del journey['no_next_point']
-                    if 'next_point' in journey:
-                        del journey['next_point']
+                    journey.pop('no_next_point', None) #deletes key value pair if it exists; no error thrown if it doesnt exist
+                    journey.pop('next_point', None) #deletes key value pair if it exists; no error thrown if it doesnt exist
+                    journey.pop('last_point_added', None) #deletes key value pair if it exists; no error thrown if it doesnt exist
                     journey['uid'] = uid
                     journeys_dict[uid] = journey
                     uid += 1
