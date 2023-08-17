@@ -4,6 +4,7 @@
 
 ### directories to ignore ###
 data_experiments/
+.vscode/
 
 ### C ###
 # Prerequisites

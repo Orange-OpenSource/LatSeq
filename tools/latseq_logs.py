@@ -637,7 +637,7 @@ class latseq_log:
                         input_DL_dict[input[2]].append(input)
             return input_DL_dict, input_UL_dict, startpoint_list
 
-        def _match_ids(self, point: dict, journey: dict) -> tuple[bool, dict, dict]:
+        def _match_IDs(self, point: dict, journey: dict) -> tuple[bool, dict, dict]:
             """checks if the fingerprint IDs of the lastest point from the journey are matching the IDs of a point;
             if the names of the fingerprints match but the values are different then the matching failed and a False and empty dictionaries are returned;
             if the names and values of the fingerprints match then a True and two dictionaries are returned, the first dictionary contains all fingerprints and values
@@ -677,15 +677,31 @@ class latseq_log:
             journey['last_point_added'] = startpoint
             return journey
 
+        def add_IDs(self, ids: dict, journey: dict) -> dict:
+            """adds IDs (fingerprints) to a journey; if there is a new key value pair in ids than a new key value pair is created in journey['set_ids'],
+            if the key from ids is already used in journey['set_ids'] than the value is turned into a list (if it isn't already a list) and value is appended;
+            returns the modified journey dict
+            """
+            for key, value in ids.items():
+                if key in journey['set_ids']:
+                    set_ids = journey['set_ids']
+                    if isinstance(set_ids[key], list) and value not in set_ids[key]:
+                        set_ids[key].append(value)
+                    elif value not in set_ids[key]:
+                        set_ids[key] = [set_ids[key], value]
+                else:
+                    journey['set_ids'][key] = value
+            return journey
+
         def _add_point_to_journey(self, point: dict, journey:dict) -> dict:
             """adds a new point to an existing journey and checks if this journey is now finished according to KWS_OUT_D/KWS_OUT_U, also updates the IDs of the journey;
             returns the existing journey with point added
             """
-            _, match_ids, logging_ids = self._match_ids(point, journey)
+            _, match_IDs, logging_IDs = self._match_IDs(point, journey)
             journey['last_point_added'] = point
             journey['set'].append((self.inputs.index(point), point[0], f"{point[2]}--{point[3]}"))
-            journey['set_ids'].update(match_ids)
-            journey['set_ids'].update(logging_ids)
+            journey = self.add_IDs(match_IDs, journey)
+            journey = self.add_IDs(logging_IDs, journey)
             journey['next_point'] = point[3]
             is_UL = point[1]
             if is_UL and point[3] in KWS_OUT_U:
@@ -696,7 +712,7 @@ class latseq_log:
                 journey['ts_out'] = point[0]
             return journey
         
-        def get_latest_timestamp(self, journey: dict) -> decimal:
+        def _get_latest_timestamp(self, journey: dict) -> decimal:
             """ returns the latest timestamp from a journey
             """
             return journey['set'][-1][1]
@@ -708,10 +724,10 @@ class latseq_log:
             """
             result_point_list = []
             for point in input_point_list:
-                if point[0]-self.get_latest_timestamp(journey) < 0 or point[0]-self.get_latest_timestamp(journey) > DURATION_TO_SEARCH_PKT:
+                if point[0]-self._get_latest_timestamp(journey) < 0 or point[0]-self._get_latest_timestamp(journey) > DURATION_TO_SEARCH_PKT:
                     continue    # jump over all points that are younger than latest part of journey or too far in the future to avoid accidental mismatches
 
-                match, _, _ = self._match_ids(point, journey)
+                match, _, _ = self._match_IDs(point, journey)
                 if match:
                     result_point_list.append(point)
                     if point in KWS_NO_SEGMENTATION:
