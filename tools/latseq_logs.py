@@ -79,7 +79,7 @@ DURATION_TO_SEARCH_RETX = decimal.Decimal(0.01) # TODO NOT USED AT THE MOMENT   
 S_TO_MS = 1000
 KWS_BUFFER = []  # buffer keywords, TODO NOT USED AT THE MOMENT
 KWS_NO_CONCATENATION = ['pdcp.in']  # TODO NOT USED AT THE MOMENT
-KWS_NO_SEGMENTATION = [] # full name of all points where segmentation can't happen; the user has to know if segmentation can happen; this improves perfomance as unnecessary search is avoided
+KWS_NO_SEGMENTATION = ['mac.demuxed--rlc.decoded'] # full name of all points where segmentation can't happen; the user has to know if segmentation can happen; this improves perfomance as unnecessary search is avoided
 KWS_IN_D = ['ip.in']  # TODO : put in conf file and verify why when add 'ip' it breaks rebuild
 KWS_OUT_D = ['phy.out.proc']
 KWS_IN_U = ['phy.start']
@@ -722,17 +722,17 @@ class latseq_log:
             accidental mismatches are avoided by limiting the time intervall of the next points to [0, DURATION_TO_SEARCH_PKT]
             relative to the lastes timestamp in the journey
             """
-            result_point_list = []
+            matched_point_list = []
             for point in input_point_list:
                 if point[0]-self._get_latest_timestamp(journey) < 0 or point[0]-self._get_latest_timestamp(journey) > DURATION_TO_SEARCH_PKT:
                     continue    # jump over all points that are younger than latest part of journey or too far in the future to avoid accidental mismatches
 
                 match, _, _ = self._match_IDs(point, journey)
                 if match:
-                    result_point_list.append(point)
-                    if point in KWS_NO_SEGMENTATION:
-                        break
-            return result_point_list
+                    matched_point_list.append(point)
+                    if journey['set'][-1][-1] in KWS_NO_SEGMENTATION:
+                        return matched_point_list # return first match as segmentation doesn't exist according to config
+            return matched_point_list
 
         def _are_all_journeys_finished(self, journeys: list) -> bool:
             """returns if all journeys which come from one startingpoint are finished;
