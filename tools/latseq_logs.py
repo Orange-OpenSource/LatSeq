@@ -707,9 +707,11 @@ class latseq_log:
             if is_UL and point[3] in KWS_OUT_U:
                 journey['completed'] = True
                 journey['ts_out'] = point[0]
+                journey['properties'] = point[4].copy()
             elif not is_UL and point[3] in KWS_OUT_D:
                 journey['completed'] = True
                 journey['ts_out'] = point[0]
+                journey['properties'] = point[4].copy()
             return journey
         
         def _get_latest_timestamp(self, journey: dict) -> decimal:
