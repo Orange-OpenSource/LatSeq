@@ -572,10 +572,9 @@ class latseq_log:
             """
             if self.use_multiprocessing:
                 results = self._rebuild_multiprocess()
-                return self._flatten_list_of_lists_to_dict(results)
             else:
                 results = self._rebuild_singleprocess()
-                return self._flatten_list_of_lists_to_dict(results)
+            return self._flatten_list_of_lists_to_dict(results)
         
         def _rebuild_singleprocess(self) -> list:
             """rebuilds all journeys from self.startpointlist in an iterative way using a single process
@@ -807,7 +806,32 @@ class latseq_log:
             journeys (:obj:`dict`): the dictionnary of journey
             out_journeys (:obj:`list`): the list of journeys prepare for output
         """
-        
+        def _add_pathIDs(journeys: dict) -> dict:
+            """adds IDs of path to each journey according to self.paths;
+            if a journey has a path not in self.paths, then it will be added
+            to self.paths
+            """
+            def _get_path_of_journey(journey: dict) -> list:
+                path_list = []
+                for index, point in enumerate(journey['set']):
+                    path_list.append(point[2].split('--')[0])
+                    if index == len(journey['set']) - 1: # add last point of journey to path
+                        path_list.append(point[2].split('--')[1])
+                return path_list
+
+            for journey in journeys.values():
+                if not journey['completed']:
+                    continue
+                paths_list = self.paths[journey['dir']]
+                journey_path = _get_path_of_journey(journey)
+                if journey_path in paths_list:
+                    journey['path'] = paths_list.index(journey_path)
+                else:
+                    paths_list.append(journey_path)
+                    journey['path'] = paths_list.index(journey_path)
+            
+            return journeys
+
         # Case: the instance has not been initialized correctly
         if not self.initialized:
             try:
@@ -817,6 +841,7 @@ class latseq_log:
 
         Rebuild_Class = self.RebuildJourneys(use_multiprocessing=MULTIPROCESSING, inputs=self.inputs, logpath=self.logpath)
         self.journeys = Rebuild_Class.rebuild_journeys()
+        self.journeys = _add_pathIDs(self.journeys)
         self.store_object()
         self._build_out_journeys()
 
